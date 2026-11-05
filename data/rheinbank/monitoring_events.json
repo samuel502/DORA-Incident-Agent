@@ -1,0 +1,1321 @@
+{
+  "about": "SYNTHETIC DATA. Monitoring problems (simulated monitoring tool) of Rheinbank AG, a fictional bank. All times UTC. No real bank or customer data.",
+  "problems": [
+    {
+      "problem_id": "PRB-0001",
+      "service_id": "SVC-MOB",
+      "title": "App errors after platform migration",
+      "events": [
+        {
+          "event_id": "EVT-0001",
+          "event_type": "incident_start",
+          "timestamp": "2025-02-15T21:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0002",
+          "event_type": "unavailable_partial",
+          "timestamp": "2025-02-15T21:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0003",
+          "event_type": "detected",
+          "timestamp": "2025-02-15T21:40:00Z",
+          "announced": null,
+          "note": "App login failures after platform migration cut-over."
+        },
+        {
+          "event_id": "EVT-0004",
+          "event_type": "restored",
+          "timestamp": "2025-05-23T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0005",
+          "event_type": "resolved",
+          "timestamp": "2025-07-31T15:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0002",
+      "service_id": "SVC-OLB",
+      "title": "Login and payment errors after platform migration",
+      "events": [
+        {
+          "event_id": "EVT-0006",
+          "event_type": "incident_start",
+          "timestamp": "2025-02-15T21:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0007",
+          "event_type": "unavailable_partial",
+          "timestamp": "2025-02-15T21:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0008",
+          "event_type": "detected",
+          "timestamp": "2025-02-15T21:35:00Z",
+          "announced": null,
+          "note": "Login and payment errors after platform migration cut-over."
+        },
+        {
+          "event_id": "EVT-0009",
+          "event_type": "restored",
+          "timestamp": "2025-05-23T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0010",
+          "event_type": "resolved",
+          "timestamp": "2025-07-31T15:00:00Z",
+          "announced": null,
+          "note": "Last migration defects closed."
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0003",
+      "service_id": "SVC-PHONE",
+      "title": "Contact centre overloaded",
+      "events": [
+        {
+          "event_id": "EVT-0011",
+          "event_type": "unavailable_partial",
+          "timestamp": "2025-02-16T07:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0012",
+          "event_type": "detected",
+          "timestamp": "2025-02-16T07:15:00Z",
+          "announced": null,
+          "note": "Call queues over 60 minutes."
+        },
+        {
+          "event_id": "EVT-0013",
+          "event_type": "restored",
+          "timestamp": "2025-04-04T16:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0014",
+          "event_type": "resolved",
+          "timestamp": "2025-04-04T16:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0004",
+      "service_id": "SVC-MOB",
+      "title": "App access problems after client migration",
+      "events": [
+        {
+          "event_id": "EVT-0015",
+          "event_type": "incident_start",
+          "timestamp": "2025-09-06T20:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0016",
+          "event_type": "unavailable_partial",
+          "timestamp": "2025-09-06T20:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0017",
+          "event_type": "detected",
+          "timestamp": "2025-09-07T06:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0018",
+          "event_type": "restored",
+          "timestamp": "2025-11-28T14:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0019",
+          "event_type": "resolved",
+          "timestamp": "2025-12-15T10:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0005",
+      "service_id": "SVC-OLB",
+      "title": "Account access problems after client migration",
+      "events": [
+        {
+          "event_id": "EVT-0020",
+          "event_type": "incident_start",
+          "timestamp": "2025-09-06T20:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0021",
+          "event_type": "unavailable_partial",
+          "timestamp": "2025-09-06T20:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0022",
+          "event_type": "detected",
+          "timestamp": "2025-09-07T06:30:00Z",
+          "announced": null,
+          "note": "Clients locked out of accounts after migration."
+        },
+        {
+          "event_id": "EVT-0023",
+          "event_type": "restored",
+          "timestamp": "2025-11-28T14:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0024",
+          "event_type": "resolved",
+          "timestamp": "2025-12-15T10:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0006",
+      "service_id": "SVC-DERIV",
+      "title": "ClearPath platform unreachable",
+      "events": [
+        {
+          "event_id": "EVT-0025",
+          "event_type": "incident_start",
+          "timestamp": "2026-02-02T06:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0026",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-02-02T06:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0027",
+          "event_type": "detected",
+          "timestamp": "2026-02-02T06:20:00Z",
+          "announced": null,
+          "note": "ClearPath platform not reachable. Trades processed by hand."
+        },
+        {
+          "event_id": "EVT-0028",
+          "event_type": "restored",
+          "timestamp": "2026-02-07T17:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0029",
+          "event_type": "resolved",
+          "timestamp": "2026-02-08T10:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0007",
+      "service_id": "SVC-HVP",
+      "title": "No settlement on EuroSettle",
+      "events": [
+        {
+          "event_id": "EVT-0030",
+          "event_type": "incident_start",
+          "timestamp": "2026-02-26T08:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0031",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-02-26T08:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0032",
+          "event_type": "detected",
+          "timestamp": "2026-02-26T08:04:00Z",
+          "announced": null,
+          "note": "No settlement confirmations from EuroSettle."
+        },
+        {
+          "event_id": "EVT-0033",
+          "event_type": "restored",
+          "timestamp": "2026-02-26T18:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0034",
+          "event_type": "backlog_cleared",
+          "timestamp": "2026-02-26T21:30:00Z",
+          "announced": null,
+          "note": "Queued large-value payments all settled."
+        },
+        {
+          "event_id": "EVT-0035",
+          "event_type": "resolved",
+          "timestamp": "2026-02-26T22:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0008",
+      "service_id": "SVC-WEB",
+      "title": "Website content update",
+      "events": [
+        {
+          "event_id": "EVT-0036",
+          "event_type": "planned_maintenance_start",
+          "timestamp": "2026-03-01T02:00:00Z",
+          "announced": true,
+          "note": "Monthly content update."
+        },
+        {
+          "event_id": "EVT-0037",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-03-01T02:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0038",
+          "event_type": "restored",
+          "timestamp": "2026-03-01T02:45:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0039",
+          "event_type": "planned_maintenance_end",
+          "timestamp": "2026-03-01T03:00:00Z",
+          "announced": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0009",
+      "service_id": "SVC-HR",
+      "title": "HR portal slow",
+      "events": [
+        {
+          "event_id": "EVT-0040",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-03-10T06:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0041",
+          "event_type": "detected",
+          "timestamp": "2026-03-10T06:45:00Z",
+          "announced": null,
+          "note": "Page loads slow."
+        },
+        {
+          "event_id": "EVT-0042",
+          "event_type": "restored",
+          "timestamp": "2026-03-10T10:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0043",
+          "event_type": "resolved",
+          "timestamp": "2026-03-10T10:30:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0010",
+      "service_id": "SVC-OLB",
+      "title": "Online banking unavailable",
+      "events": [
+        {
+          "event_id": "EVT-0044",
+          "event_type": "incident_start",
+          "timestamp": "2026-03-17T13:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0045",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-03-17T13:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0046",
+          "event_type": "detected",
+          "timestamp": "2026-03-17T13:02:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0047",
+          "event_type": "restored",
+          "timestamp": "2026-03-17T13:40:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0048",
+          "event_type": "resolved",
+          "timestamp": "2026-03-17T13:45:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0011",
+      "service_id": "SVC-MOB",
+      "title": "App login and payment failures",
+      "events": [
+        {
+          "event_id": "EVT-0049",
+          "event_type": "incident_start",
+          "timestamp": "2026-03-30T05:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0050",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-03-30T05:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0051",
+          "event_type": "detected",
+          "timestamp": "2026-03-30T05:52:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0052",
+          "event_type": "restored",
+          "timestamp": "2026-04-01T18:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0053",
+          "event_type": "resolved",
+          "timestamp": "2026-04-02T08:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0012",
+      "service_id": "SVC-OLB",
+      "title": "Login and online payment failures",
+      "events": [
+        {
+          "event_id": "EVT-0054",
+          "event_type": "incident_start",
+          "timestamp": "2026-03-30T05:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0055",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-03-30T05:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0056",
+          "event_type": "detected",
+          "timestamp": "2026-03-30T05:50:00Z",
+          "announced": null,
+          "note": "Login failures about 5%, online payment failures over 50%."
+        },
+        {
+          "event_id": "EVT-0057",
+          "event_type": "restored",
+          "timestamp": "2026-04-01T18:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0058",
+          "event_type": "resolved",
+          "timestamp": "2026-04-02T08:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0013",
+      "service_id": "SVC-SEPA",
+      "title": "Outgoing SEPA payments stopped",
+      "events": [
+        {
+          "event_id": "EVT-0059",
+          "event_type": "incident_start",
+          "timestamp": "2026-04-14T08:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0060",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-04-14T08:00:00Z",
+          "announced": null,
+          "note": "Outgoing SEPA payments stopped."
+        },
+        {
+          "event_id": "EVT-0061",
+          "event_type": "detected",
+          "timestamp": "2026-04-14T08:05:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0062",
+          "event_type": "restored",
+          "timestamp": "2026-04-14T11:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0063",
+          "event_type": "resolved",
+          "timestamp": "2026-04-14T11:30:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0014",
+      "service_id": "SVC-OLB",
+      "title": "Online banking unreachable, traffic flood",
+      "events": [
+        {
+          "event_id": "EVT-0064",
+          "event_type": "incident_start",
+          "timestamp": "2026-04-30T14:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0065",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-04-30T14:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0066",
+          "event_type": "detected",
+          "timestamp": "2026-04-30T14:34:00Z",
+          "announced": null,
+          "note": "Inbound traffic about 40 times normal."
+        },
+        {
+          "event_id": "EVT-0067",
+          "event_type": "restored",
+          "timestamp": "2026-05-06T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0068",
+          "event_type": "resolved",
+          "timestamp": "2026-05-06T12:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0015",
+      "service_id": "SVC-ATM",
+      "title": "ATM withdrawals failing",
+      "events": [
+        {
+          "event_id": "EVT-0069",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-04-30T14:40:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0070",
+          "event_type": "detected",
+          "timestamp": "2026-04-30T14:45:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0071",
+          "event_type": "restored",
+          "timestamp": "2026-05-01T02:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0072",
+          "event_type": "resolved",
+          "timestamp": "2026-05-01T02:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0016",
+      "service_id": "SVC-CARD",
+      "title": "Card payment errors",
+      "events": [
+        {
+          "event_id": "EVT-0073",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-04-30T14:45:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0074",
+          "event_type": "detected",
+          "timestamp": "2026-04-30T14:50:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0075",
+          "event_type": "restored",
+          "timestamp": "2026-04-30T20:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0076",
+          "event_type": "resolved",
+          "timestamp": "2026-04-30T20:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0017",
+      "service_id": "SVC-SEC",
+      "title": "Settlement servers unreachable",
+      "events": [
+        {
+          "event_id": "EVT-0077",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-05-12T01:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0078",
+          "event_type": "detected",
+          "timestamp": "2026-05-12T01:10:00Z",
+          "announced": null,
+          "note": "Settlement servers unreachable."
+        },
+        {
+          "event_id": "EVT-0079",
+          "event_type": "restored",
+          "timestamp": "2026-05-14T16:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0080",
+          "event_type": "resolved",
+          "timestamp": "2026-05-15T12:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0018",
+      "service_id": "SVC-OLB",
+      "title": "Customers can't log in",
+      "events": [
+        {
+          "event_id": "EVT-0081",
+          "event_type": "incident_start",
+          "timestamp": "2026-05-26T07:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0082",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-05-26T07:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0083",
+          "event_type": "detected",
+          "timestamp": "2026-05-26T07:12:00Z",
+          "announced": null,
+          "note": "Customers can't log in."
+        },
+        {
+          "event_id": "EVT-0084",
+          "event_type": "restored",
+          "timestamp": "2026-05-26T12:40:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0085",
+          "event_type": "resolved",
+          "timestamp": "2026-05-26T13:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0019",
+      "service_id": "SVC-CARD",
+      "title": "Card authorisation failures",
+      "events": [
+        {
+          "event_id": "EVT-0086",
+          "event_type": "incident_start",
+          "timestamp": "2026-06-01T12:35:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0087",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-06-01T12:35:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0088",
+          "event_type": "detected",
+          "timestamp": "2026-06-01T12:41:00Z",
+          "announced": null,
+          "note": "Authorisation failures rising. Processor reports a data centre fault."
+        },
+        {
+          "event_id": "EVT-0089",
+          "event_type": "restored",
+          "timestamp": "2026-06-01T22:45:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0090",
+          "event_type": "resolved",
+          "timestamp": "2026-06-01T23:30:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0020",
+      "service_id": "SVC-CARD",
+      "title": "Card payments failing",
+      "events": [
+        {
+          "event_id": "EVT-0091",
+          "event_type": "incident_start",
+          "timestamp": "2026-06-13T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0092",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-06-13T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0093",
+          "event_type": "detected",
+          "timestamp": "2026-06-13T10:03:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0094",
+          "event_type": "restored",
+          "timestamp": "2026-06-13T11:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0095",
+          "event_type": "resolved",
+          "timestamp": "2026-06-13T11:45:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0021",
+      "service_id": "SVC-OFFICE",
+      "title": "Laptops crash at start-up",
+      "events": [
+        {
+          "event_id": "EVT-0096",
+          "event_type": "incident_start",
+          "timestamp": "2026-07-16T04:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0097",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-07-16T04:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0098",
+          "event_type": "detected",
+          "timestamp": "2026-07-16T04:20:00Z",
+          "announced": null,
+          "note": "Laptops crash at start-up after a security software update."
+        },
+        {
+          "event_id": "EVT-0099",
+          "event_type": "restored",
+          "timestamp": "2026-07-16T08:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0100",
+          "event_type": "resolved",
+          "timestamp": "2026-07-16T08:30:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0022",
+      "service_id": "SVC-PAYOPS",
+      "title": "Payment workstations crash at start-up",
+      "events": [
+        {
+          "event_id": "EVT-0101",
+          "event_type": "incident_start",
+          "timestamp": "2026-07-16T04:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0102",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-07-16T04:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0103",
+          "event_type": "detected",
+          "timestamp": "2026-07-16T04:20:00Z",
+          "announced": null,
+          "note": "Workstations in Duesseldorf and Vienna crash after a security software update. Payments queuing."
+        },
+        {
+          "event_id": "EVT-0104",
+          "event_type": "restored",
+          "timestamp": "2026-07-16T09:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0105",
+          "event_type": "resolved",
+          "timestamp": "2026-07-16T09:30:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0023",
+      "service_id": "SVC-MOB",
+      "title": "App login errors",
+      "events": [
+        {
+          "event_id": "EVT-0106",
+          "event_type": "incident_start",
+          "timestamp": "2026-08-04T09:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0107",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-08-04T09:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0108",
+          "event_type": "detected",
+          "timestamp": "2026-08-04T09:04:00Z",
+          "announced": null,
+          "note": "Login errors for part of the app users."
+        },
+        {
+          "event_id": "EVT-0109",
+          "event_type": "restored",
+          "timestamp": "2026-08-04T10:10:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0110",
+          "event_type": "resolved",
+          "timestamp": "2026-08-04T10:15:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0024",
+      "service_id": "SVC-MOB",
+      "title": "Wrong balances shown, limit checks not applied",
+      "events": [
+        {
+          "event_id": "EVT-0111",
+          "event_type": "incident_start",
+          "timestamp": "2026-08-18T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0112",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-08-18T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0113",
+          "event_type": "detected",
+          "timestamp": "2026-08-18T15:20:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0114",
+          "event_type": "restored",
+          "timestamp": "2026-08-18T23:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0115",
+          "event_type": "resolved",
+          "timestamp": "2026-08-19T06:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0025",
+      "service_id": "SVC-OLB",
+      "title": "Wrong balances shown, limit checks not applied",
+      "events": [
+        {
+          "event_id": "EVT-0116",
+          "event_type": "incident_start",
+          "timestamp": "2026-08-18T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0117",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-08-18T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0118",
+          "event_type": "detected",
+          "timestamp": "2026-08-18T15:20:00Z",
+          "announced": null,
+          "note": "Balances shown incorrectly. Some limit checks not applied."
+        },
+        {
+          "event_id": "EVT-0119",
+          "event_type": "restored",
+          "timestamp": "2026-08-18T23:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0120",
+          "event_type": "resolved",
+          "timestamp": "2026-08-19T06:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0026",
+      "service_id": "SVC-PHONE",
+      "title": "Wrong balances shown, limit checks not applied",
+      "events": [
+        {
+          "event_id": "EVT-0121",
+          "event_type": "incident_start",
+          "timestamp": "2026-08-18T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0122",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-08-18T15:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0123",
+          "event_type": "detected",
+          "timestamp": "2026-08-18T15:20:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0124",
+          "event_type": "restored",
+          "timestamp": "2026-08-18T23:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0125",
+          "event_type": "resolved",
+          "timestamp": "2026-08-19T06:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0027",
+      "service_id": "SVC-CORE",
+      "title": "Batch jobs failing",
+      "events": [
+        {
+          "event_id": "EVT-0126",
+          "event_type": "incident_start",
+          "timestamp": "2026-08-26T06:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0127",
+          "event_type": "unavailable_partial",
+          "timestamp": "2026-08-26T06:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0128",
+          "event_type": "detected",
+          "timestamp": "2026-08-26T06:10:00Z",
+          "announced": null,
+          "note": "Batch jobs failing. Suspected storage hardware fault."
+        },
+        {
+          "event_id": "EVT-0129",
+          "event_type": "restored",
+          "timestamp": "2026-08-27T14:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0130",
+          "event_type": "resolved",
+          "timestamp": "2026-08-28T10:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0028",
+      "service_id": "SVC-MOB",
+      "title": "Release 26.9 maintenance window",
+      "events": [
+        {
+          "event_id": "EVT-0131",
+          "event_type": "planned_maintenance_start",
+          "timestamp": "2026-09-12T16:00:00Z",
+          "announced": true,
+          "note": "Release 26.9, announced to clients on 2026-09-01."
+        },
+        {
+          "event_id": "EVT-0132",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-09-12T16:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0133",
+          "event_type": "restored",
+          "timestamp": "2026-09-14T03:40:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0134",
+          "event_type": "resolved",
+          "timestamp": "2026-09-14T03:40:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0135",
+          "event_type": "planned_maintenance_end",
+          "timestamp": "2026-09-14T04:00:00Z",
+          "announced": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0029",
+      "service_id": "SVC-OLB",
+      "title": "Release 26.9 maintenance window",
+      "events": [
+        {
+          "event_id": "EVT-0136",
+          "event_type": "planned_maintenance_start",
+          "timestamp": "2026-09-12T16:00:00Z",
+          "announced": true,
+          "note": "Release 26.9, announced to clients on 2026-09-01."
+        },
+        {
+          "event_id": "EVT-0137",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-09-12T16:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0138",
+          "event_type": "planned_maintenance_end",
+          "timestamp": "2026-09-14T04:00:00Z",
+          "announced": true,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0139",
+          "event_type": "restored",
+          "timestamp": "2026-09-14T09:30:00Z",
+          "announced": null,
+          "note": "Service back 5.5 hours after the planned end."
+        },
+        {
+          "event_id": "EVT-0140",
+          "event_type": "resolved",
+          "timestamp": "2026-09-14T10:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0030",
+      "service_id": "SVC-SEPA",
+      "title": "Payment files not processed",
+      "events": [
+        {
+          "event_id": "EVT-0141",
+          "event_type": "incident_start",
+          "timestamp": "2026-10-01T07:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0142",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-10-01T07:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0143",
+          "event_type": "detected",
+          "timestamp": "2026-10-01T08:10:00Z",
+          "announced": null,
+          "note": "No payment files processed through Rhein IT Services."
+        },
+        {
+          "event_id": "EVT-0144",
+          "event_type": "restored",
+          "timestamp": "2026-10-01T19:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0145",
+          "event_type": "backlog_cleared",
+          "timestamp": "2026-10-05T16:00:00Z",
+          "announced": null,
+          "note": "Last delayed payment files processed."
+        },
+        {
+          "event_id": "EVT-0146",
+          "event_type": "resolved",
+          "timestamp": "2026-10-05T17:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0031",
+      "service_id": "SVC-MAIL",
+      "title": "Unavailable, fault at Rhein IT Services",
+      "events": [
+        {
+          "event_id": "EVT-0147",
+          "event_type": "incident_start",
+          "timestamp": "2026-10-21T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0148",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-10-21T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0149",
+          "event_type": "detected",
+          "timestamp": "2026-10-21T10:05:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0150",
+          "event_type": "restored",
+          "timestamp": "2026-10-21T21:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0151",
+          "event_type": "resolved",
+          "timestamp": "2026-10-21T22:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    },
+    {
+      "problem_id": "PRB-0032",
+      "service_id": "SVC-OLB",
+      "title": "Unavailable, fault at Rhein IT Services",
+      "events": [
+        {
+          "event_id": "EVT-0152",
+          "event_type": "incident_start",
+          "timestamp": "2026-10-21T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0153",
+          "event_type": "unavailable_full",
+          "timestamp": "2026-10-21T10:00:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0154",
+          "event_type": "detected",
+          "timestamp": "2026-10-21T10:05:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0155",
+          "event_type": "restored",
+          "timestamp": "2026-10-21T21:30:00Z",
+          "announced": null,
+          "note": null
+        },
+        {
+          "event_id": "EVT-0156",
+          "event_type": "resolved",
+          "timestamp": "2026-10-21T22:00:00Z",
+          "announced": null,
+          "note": null
+        }
+      ]
+    }
+  ]
+}

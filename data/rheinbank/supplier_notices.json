@@ -1,0 +1,132 @@
+{
+  "about": "SYNTHETIC DATA. Notices received from ICT third-party providers (simulated) by Rheinbank AG, a fictional bank. All times UTC. null means not stated by the supplier.",
+  "notices": [
+    {
+      "notice_id": "NTC-0001",
+      "supplier_id": "SUP-CLRP",
+      "received_at": "2026-02-02T07:45:00Z",
+      "start": "2026-02-02T05:00:00Z",
+      "end": "2026-02-07T17:00:00Z",
+      "notice_type": "cyber_attack",
+      "cyber_attack": "yes",
+      "bank_data_involved": "unknown",
+      "member_states_affected": null,
+      "note": "Ransomware on our hosted clearing platform. Clients should process trades manually. Full service expected on 6 February."
+    },
+    {
+      "notice_id": "NTC-0002",
+      "supplier_id": "SUP-EUSET",
+      "received_at": "2026-02-26T08:30:00Z",
+      "start": "2026-02-26T08:00:00Z",
+      "end": "2026-02-26T18:00:00Z",
+      "notice_type": "outage",
+      "cyber_attack": "no",
+      "bank_data_involved": "no",
+      "member_states_affected": [
+        "AT",
+        "BE",
+        "CY",
+        "DE",
+        "EE",
+        "ES",
+        "FI",
+        "FR",
+        "GR",
+        "HR",
+        "IE",
+        "IT",
+        "LT",
+        "LU",
+        "LV",
+        "MT",
+        "NL",
+        "PT",
+        "SI",
+        "SK"
+      ],
+      "note": "Hardware defect. Settlement suspended for all participants. Not a cyber attack. Cut-offs postponed."
+    },
+    {
+      "notice_id": "NTC-0003",
+      "supplier_id": "SUP-CNET",
+      "received_at": "2026-06-01T13:20:00Z",
+      "start": "2026-06-01T12:35:00Z",
+      "end": "2026-06-01T22:45:00Z",
+      "notice_type": "outage",
+      "cyber_attack": "no",
+      "bank_data_involved": "no",
+      "member_states_affected": [
+        "AT",
+        "BE",
+        "DE",
+        "FR",
+        "NL"
+      ],
+      "note": "Data centre switch fault causing card authorisation failures across Europe."
+    },
+    {
+      "notice_id": "NTC-0004",
+      "supplier_id": "SUP-SDRP",
+      "received_at": "2026-06-05T08:30:00Z",
+      "start": "2026-06-01T00:00:00Z",
+      "end": "2026-06-03T00:00:00Z",
+      "notice_type": "breach",
+      "cyber_attack": "yes",
+      "bank_data_involved": "yes",
+      "member_states_affected": null,
+      "note": "Attackers exploited a flaw in our transfer software and copied files. Files from your organisation were among them."
+    },
+    {
+      "notice_id": "NTC-0005",
+      "supplier_id": "SUP-SHLD",
+      "received_at": "2026-07-16T04:40:00Z",
+      "start": "2026-07-16T04:09:00Z",
+      "end": "2026-07-16T05:39:00Z",
+      "notice_type": "faulty_update",
+      "cyber_attack": "no",
+      "bank_data_involved": "no",
+      "member_states_affected": null,
+      "note": "A faulty content update crashed Windows devices. The update was withdrawn at 05:39 UTC. Affected devices need manual repair."
+    },
+    {
+      "notice_id": "NTC-0006",
+      "supplier_id": "SUP-RITS",
+      "received_at": "2026-10-01T08:30:00Z",
+      "start": "2026-10-01T07:30:00Z",
+      "end": "2026-10-01T19:00:00Z",
+      "notice_type": "outage",
+      "cyber_attack": "no",
+      "bank_data_involved": "no",
+      "member_states_affected": [
+        "DE"
+      ],
+      "note": "Technical fault stopped the processing of payment files. A cyber attack is ruled out. Some unprocessed files were found after the fix."
+    },
+    {
+      "notice_id": "NTC-0007",
+      "supplier_id": "SUP-FNSW",
+      "received_at": "2026-10-07T07:30:00Z",
+      "start": "2026-09-28T00:00:00Z",
+      "end": "2026-10-06T00:00:00Z",
+      "notice_type": "breach",
+      "cyber_attack": "yes",
+      "bank_data_involved": "unknown",
+      "member_states_affected": null,
+      "note": "An attacker used stolen credentials to access our file delivery platform. Investigation of affected files is ongoing."
+    },
+    {
+      "notice_id": "NTC-0008",
+      "supplier_id": "SUP-RITS",
+      "received_at": "2026-10-21T10:20:00Z",
+      "start": "2026-10-21T10:00:00Z",
+      "end": "2026-10-21T21:30:00Z",
+      "notice_type": "outage",
+      "cyber_attack": "no",
+      "bank_data_involved": "no",
+      "member_states_affected": [
+        "DE"
+      ],
+      "note": "Technical fault in our data centre affecting online banking and email for several client banks."
+    }
+  ]
+}

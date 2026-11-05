@@ -1,0 +1,447 @@
+{
+  "about": "TEST INDEX (answer key). Maps every case in docs/case-library.md to its ticket text, Rheinbank service, time (UTC) and expected result. Used by tests only: the agent must never read this file. Real case names appear here and nowhere in data/rheinbank/. Scripted human answers are added in block 5.",
+  "case_library": "docs/case-library.md, batch 1",
+  "scenarios": [
+    {
+      "scenario_id": "C01",
+      "case_id": "C01",
+      "variant": null,
+      "title": "Failed platform migration",
+      "real_case": "TSB IT migration, UK, April 2018",
+      "ticket": "Since the platform migration on Saturday night (15 Feb, 22:00), customers can't log into online or mobile banking and payments fail. Call centre queues are over an hour.",
+      "service_id": "SVC-OLB",
+      "around": "2025-02-15T21:00:00Z",
+      "expected_result": "major",
+      "why": "T1, T2, T3, T6",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "C02",
+      "case_id": "C02",
+      "variant": null,
+      "title": "Failed client migration",
+      "real_case": "Postbank IT migration, Germany, 2023",
+      "ticket": "Clients have been locked out of their accounts since the client migration started on Saturday at 22:00. Online and mobile banking problems, call centres overwhelmed, complaints piling up.",
+      "service_id": "SVC-OLB",
+      "around": "2025-09-06T20:00:00Z",
+      "expected_result": "major",
+      "why": "T2, T3 (T6 likely)",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "C03",
+      "case_id": "C03",
+      "variant": null,
+      "title": "Settlement platform outage",
+      "real_case": "TARGET Services outage, EU, 27 February 2025",
+      "ticket": "Large-value euro payments can't settle since 09:00. The EuroSettle platform is down for all participants, not just us. Cut-offs are being pushed back.",
+      "service_id": "SVC-HVP",
+      "around": "2026-02-26T08:00:00Z",
+      "expected_result": "major",
+      "why": "T3, T4 (T1 likely)",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C04",
+      "case_id": "C04",
+      "variant": null,
+      "title": "Three-day software fault",
+      "real_case": "Barclays outage, UK, 31 January to 2 February 2025",
+      "ticket": "Since 07:30 the app and online banking are failing for many customers. More than half of online payments fail. It's month-end payday.",
+      "service_id": "SVC-OLB",
+      "around": "2026-03-30T05:30:00Z",
+      "expected_result": "major",
+      "why": "T2, T3, T6 (T1 likely)",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "C05",
+      "case_id": "C05",
+      "variant": null,
+      "title": "Card processor hardware fault",
+      "real_case": "Visa Europe outage, 1 June 2018",
+      "ticket": "Card payments are failing in shops since 14:35, in Germany and abroad. CardNet reports a data centre problem.",
+      "service_id": "SVC-CARD",
+      "around": "2026-06-01T12:35:00Z",
+      "expected_result": "major",
+      "why": "T2, T3, T4",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C06",
+      "case_id": "C06",
+      "variant": null,
+      "title": "Ransomware on securities settlement",
+      "real_case": "ICBC Financial Services ransomware, US, November 2023",
+      "ticket": "Securities settlement servers were encrypted overnight, there's a ransom note on screen. We can't settle trades for counterparties.",
+      "service_id": "SVC-SEC",
+      "around": "2026-05-12T01:10:00Z",
+      "expected_result": "major",
+      "why": "Gate G-c, T5-b",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "security_alerts"
+      ]
+    },
+    {
+      "scenario_id": "C07",
+      "case_id": "C07",
+      "variant": null,
+      "title": "Ransomware at the derivatives vendor",
+      "real_case": "ION Markets ransomware, from 31 January 2023 (as a client bank)",
+      "ticket": "ClearPath says it was hit by ransomware. Our derivatives clearing has been down since 07:00 and staff are processing trades by hand.",
+      "service_id": "SVC-DERIV",
+      "around": "2026-02-02T06:00:00Z",
+      "expected_result": "major",
+      "why": "T2, T3",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "security_alerts",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C08",
+      "case_id": "C08",
+      "variant": null,
+      "title": "DDoS attack",
+      "real_case": "OP Pohjola DDoS, Finland, 31 December 2014 onwards",
+      "ticket": "Massive traffic flood on our network since 16:30. Online banking is down, ATMs and card payments are having problems.",
+      "service_id": "SVC-OLB",
+      "around": "2026-04-30T14:30:00Z",
+      "expected_result": "major",
+      "why": "T2, T3",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "security_alerts"
+      ]
+    },
+    {
+      "scenario_id": "C09",
+      "case_id": "C09",
+      "variant": null,
+      "title": "Wrong balances after a software fault",
+      "real_case": "Bank of Ireland glitch, Ireland, 15 to 16 August 2023",
+      "ticket": "App, online and phone banking failing since 17:00. Some customers can withdraw more than their balance. Queues at ATMs.",
+      "service_id": "SVC-OLB",
+      "around": "2026-08-18T15:00:00Z",
+      "expected_result": "major",
+      "why": "T2, T3",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "C10",
+      "case_id": "C10",
+      "variant": null,
+      "title": "Cloud data breach found months later",
+      "real_case": "Capital One breach, US, March 2019 (disclosed July 2019)",
+      "ticket": "An outside researcher tipped us off: credit application data from our cloud environment is being shared online. Logs show access since March.",
+      "service_id": "SVC-LOAN",
+      "around": "2026-07-21T07:00:00Z",
+      "expected_result": "major",
+      "why": "Gate G-c, T5-b",
+      "data_sources": [
+        "client_impact",
+        "security_alerts"
+      ]
+    },
+    {
+      "scenario_id": "C11",
+      "case_id": "C11",
+      "variant": null,
+      "title": "Breach at the file transfer vendor",
+      "real_case": "Flagstar Bank via MOVEit at Fiserv, US, 2023",
+      "ticket": "SecureDrop, our file transfer vendor, says attackers exploited a flaw in its software and copied files. Our customer files were among them.",
+      "service_id": "SVC-MFT",
+      "around": "2026-06-05T09:00:00Z",
+      "expected_result": "depends_on_gate",
+      "why": "T1, T2 met; gate unclear",
+      "data_sources": [
+        "client_impact",
+        "security_alerts",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C12",
+      "case_id": "C12",
+      "variant": null,
+      "title": "Ransomware first read as a hardware fault",
+      "real_case": "Evolve Bank & Trust ransomware, US, February to May 2024",
+      "ticket": "Core banking systems not working properly since 08:00. Batch jobs are failing, it looks like a storage hardware failure.",
+      "service_id": "SVC-CORE",
+      "around": "2026-08-26T06:00:00Z",
+      "expected_result": "major",
+      "why": "Gate G-c, T5-b",
+      "data_sources": [
+        "monitoring",
+        "security_alerts"
+      ]
+    },
+    {
+      "scenario_id": "C13",
+      "case_id": "C13",
+      "variant": null,
+      "title": "Breach at a software supplier's file platform",
+      "real_case": "Finastra SFTP breach, 31 October to 8 November 2024 (as a client bank)",
+      "ticket": "Fintegra warns that an attacker accessed the file transfer platform it uses to send us files. They don't know yet if our files were affected.",
+      "service_id": "SVC-MFT",
+      "around": "2026-10-07T08:00:00Z",
+      "expected_result": "depends",
+      "why": "Gate and data impact unclear",
+      "data_sources": [
+        "client_impact",
+        "security_alerts",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C14",
+      "case_id": "C14",
+      "variant": null,
+      "title": "Outsourcer fault with a payment backlog",
+      "real_case": "Helaba / FI-TS payment outage, Germany, 5 December 2019",
+      "ticket": "SEPA transfers and direct debits stopped at 09:30 because of a fault at Rhein IT Services. Unprocessed payment files are still turning up.",
+      "service_id": "SVC-SEPA",
+      "around": "2026-10-01T07:30:00Z",
+      "expected_result": "major",
+      "why": "T2, T3",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C15",
+      "case_id": "C15",
+      "variant": null,
+      "title": "Outsourcer fault hits online banking",
+      "real_case": "FI-TS outage hitting DKB, Germany, 25 October 2023",
+      "ticket": "Online banking has been down since around noon, email too. Rhein IT Services reports a technical fault.",
+      "service_id": "SVC-OLB",
+      "around": "2026-10-21T10:00:00Z",
+      "expected_result": "major",
+      "why": "T2, T3",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C16-A",
+      "case_id": "C16",
+      "variant": "A",
+      "title": "Planned release, finished on time",
+      "real_case": "Sparkasse online banking, Germany, 12 to 14 October 2019",
+      "ticket": "The mobile app has been unavailable since Saturday 18:00. Is this the release weekend?",
+      "service_id": "SVC-MOB",
+      "around": "2026-09-12T16:00:00Z",
+      "expected_result": "not_an_incident",
+      "why": "Planned and announced, back inside the window",
+      "data_sources": [
+        "monitoring"
+      ]
+    },
+    {
+      "scenario_id": "C16-B",
+      "case_id": "C16",
+      "variant": "B",
+      "title": "Planned release that overran",
+      "real_case": "Sparkasse online banking, Germany, 12 to 14 October 2019",
+      "ticket": "Online banking is still not back on Monday at 08:00. The release window ended at 06:00.",
+      "service_id": "SVC-OLB",
+      "around": "2026-09-14T06:00:00Z",
+      "expected_result": "classify_overrun",
+      "why": "The overrun beyond the planned window is an incident",
+      "data_sources": [
+        "monitoring"
+      ]
+    },
+    {
+      "scenario_id": "C17-A",
+      "case_id": "C17",
+      "variant": "A",
+      "title": "Faulty security update, office laptops",
+      "real_case": "CrowdStrike outage, 19 July 2024 (variant A)",
+      "ticket": "Office laptops crash with a blue screen after a security software update since 06:10. Online banking and payments are running normally.",
+      "service_id": "SVC-OFFICE",
+      "around": "2026-07-16T04:10:00Z",
+      "expected_result": "not_major",
+      "why": "Gate fails",
+      "data_sources": [
+        "monitoring",
+        "security_alerts",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "C17-B",
+      "case_id": "C17",
+      "variant": "B",
+      "title": "Faulty security update, payment workstations",
+      "real_case": "CrowdStrike outage, 19 July 2024 (variant B)",
+      "ticket": "Payment operations workstations in Duesseldorf and Vienna crash after a security software update since 06:10. Payments are queuing.",
+      "service_id": "SVC-PAYOPS",
+      "around": "2026-07-16T04:10:00Z",
+      "expected_result": "major",
+      "why": "T3, T4",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "security_alerts",
+        "supplier_notices"
+      ]
+    },
+    {
+      "scenario_id": "N01",
+      "case_id": "N01",
+      "variant": null,
+      "title": "HR portal slow",
+      "real_case": null,
+      "ticket": "HR portal is slow this morning.",
+      "service_id": "SVC-HR",
+      "around": "2026-03-10T06:30:00Z",
+      "expected_result": "not_major",
+      "why": "Gate fails",
+      "data_sources": [
+        "monitoring"
+      ]
+    },
+    {
+      "scenario_id": "N02",
+      "case_id": "N02",
+      "variant": null,
+      "title": "Short online banking blip",
+      "real_case": null,
+      "ticket": "Online banking was unavailable for about 40 minutes from 14:00 this afternoon. A handful of complaints.",
+      "service_id": "SVC-OLB",
+      "around": "2026-03-17T13:00:00Z",
+      "expected_result": "not_major",
+      "why": "0 thresholds",
+      "data_sources": [
+        "monitoring",
+        "client_impact",
+        "security_alerts"
+      ]
+    },
+    {
+      "scenario_id": "N03",
+      "case_id": "N03",
+      "variant": null,
+      "title": "Payments down 3 hours, nothing else",
+      "real_case": null,
+      "ticket": "Outgoing SEPA payments stopped from 10:00 to 13:00, then were processed normally.",
+      "service_id": "SVC-SEPA",
+      "around": "2026-04-14T08:00:00Z",
+      "expected_result": "not_major",
+      "why": "Only 1 threshold",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "N04",
+      "case_id": "N04",
+      "variant": null,
+      "title": "Phishing click, no access",
+      "real_case": null,
+      "ticket": "An employee clicked a phishing link this morning. Security says the login was blocked.",
+      "service_id": "SVC-MAIL",
+      "around": "2026-05-20T09:15:00Z",
+      "expected_result": "not_major",
+      "why": "No successful access",
+      "data_sources": [
+        "security_alerts"
+      ]
+    },
+    {
+      "scenario_id": "N05",
+      "case_id": "N05",
+      "variant": null,
+      "title": "Short outage, costly and in the news",
+      "real_case": null,
+      "ticket": "Card payments failed for 90 minutes from 12:00 during the Saturday shopping peak. National news covered it. Vendor support and refunds will cost about 140,000 euros.",
+      "service_id": "SVC-CARD",
+      "around": "2026-06-13T10:00:00Z",
+      "expected_result": "major",
+      "why": "T2, T6",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "N06",
+      "case_id": "N06",
+      "variant": null,
+      "title": "Exactly 10% of clients",
+      "real_case": null,
+      "ticket": "Mobile banking login has been failing for part of the app users since 11:00.",
+      "service_id": "SVC-MOB",
+      "around": "2026-08-04T09:00:00Z",
+      "expected_result": "not_major",
+      "why": "Boundary: 10% is not more than 10%",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "B01",
+      "case_id": "B01",
+      "variant": null,
+      "title": "Brief example: online banking down",
+      "real_case": "Project brief example (made up)",
+      "ticket": "Online banking down since 9:10, customers can't log in.",
+      "service_id": "SVC-OLB",
+      "around": "2026-05-26T07:10:00Z",
+      "expected_result": "major",
+      "why": "T1, T3",
+      "data_sources": [
+        "monitoring",
+        "client_impact"
+      ]
+    },
+    {
+      "scenario_id": "B03",
+      "case_id": "B03",
+      "variant": null,
+      "title": "Brief example: large data transfer at night",
+      "real_case": "Project brief example (made up)",
+      "ticket": "SOC flagged a large data transfer at 2 a.m.",
+      "service_id": "SVC-LOAN",
+      "around": "2026-09-02T00:05:00Z",
+      "expected_result": "depends_on_human",
+      "why": "Major only if a human confirms successful malicious access",
+      "data_sources": [
+        "security_alerts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[project]
+name = "dora-incident-agent"
+version = "0.1.0"
+description = "DORA incident classification agent for a simulated bank (Rheinbank). Portfolio prototype, not legal advice."
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic==2.14.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"

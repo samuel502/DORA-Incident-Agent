@@ -1,0 +1,18 @@
+{
+  "about": "SYNTHETIC DATA. Basic entity facts of Rheinbank AG, a fictional bank. No real bank or customer data.",
+  "profile": {
+    "name": "Rheinbank AG",
+    "entity_type": "credit_institution",
+    "microenterprise": false,
+    "home_member_state": "DE",
+    "head_office_city": "Duesseldorf",
+    "branches": [
+      {
+        "city": "Wien",
+        "member_state": "AT"
+      }
+    ],
+    "total_clients": 1200000,
+    "as_of": "2025-12-31"
+  }
+}

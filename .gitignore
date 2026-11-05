@@ -1,0 +1,25 @@
+# Claude Code working copies (git worktrees)
+.claude/worktrees/
+
+# Secrets: API keys live only in environment variables (CLAUDE.md hard rule 5)
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Local logs (block 5 writes decision logs here)
+logs/

@@ -2,7 +2,9 @@
 
 The single source of truth for the rules engine. Every rule in code must point to a line here and to its article. Nothing gets coded that isn't on this sheet.
 
-Rule version: 1.0 (4 November 2026)
+Rule version: 1.1 (4 November 2026)
+
+Changes in 1.1: open questions 4, 5 and 6 added to section 8 (found while mapping `case-library.md`), the daily average method added to open question 6, and the client totals method added as open question 7. No threshold, criterion or rule logic changed.
 
 Verified: Sam checked the spot-check list in section 9 against the official EUR-Lex text on 4 November 2026. All five match.
 
@@ -206,7 +208,8 @@ These are interpretation points, flagged for review (for example with the PwC co
 3. **Rheinbank as a credit institution:** our fake bank is a bank, so it is not a microenterprise and not one of the simplified-regime entities.
 4. **Third-party breaches:** when an attacker got into a supplier's systems, not the bank's, version 1 does not count it as G-c or T5-b for the bank (RTS-C Art. 6(c) refers to the financial entity's own systems). The other criteria decide. Found while mapping `case-library.md` cases C07, C11, C13.
 5. **Planned vs unplanned:** DORA Art. 3(8) covers only events unplanned by the financial entity. Version 1 asks the human whether downtime was planned and announced. If fully planned, there is nothing to classify. Found in case C16.
-6. **Daily averages:** T1-d and T1-e compare against the daily average for the service, not the incident window. Rheinbank's client data must hold daily averages per service. Found in cases C03, C04, C05.
+6. **Daily averages:** T1-d and T1-e compare against the daily average for the service, not the incident window. Rheinbank's client data must hold daily averages per service. Found in cases C03, C04, C05. Method in version 1: the daily average is taken over the previous calendar month (that month's total divided by its number of days). RTS-C does not fix the period, so this is a bank method choice, not a DORA rule. Approved by Sam on 4 November 2026.
+7. **Client totals:** T1-a and T1-c compare affected clients and counterparts against all clients and counterparts using the service (RTS-C Art. 9(1)(a) and (c)). RTS-C does not say on which date to count them. Method in version 1: Rheinbank's client data keeps a yearly snapshot per service, taken on 31 December, and the tool uses the latest snapshot on or before the incident date. This is a bank method choice, not a DORA rule. Approved by Sam on 4 November 2026.
 
 ## 9. Spot-check list for Sam
 

@@ -1,0 +1,1589 @@
+{
+  "about": "SYNTHETIC DATA. Daily average transactions per service per calendar month (simulated core banking) of Rheinbank AG, a fictional bank. No real bank or customer data. Each row: that month's total divided by its number of days.",
+  "averages": [
+    {
+      "average_id": "AVG-0001",
+      "service_id": "SVC-ATM",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 174600,
+      "daily_avg_tx_value_eur": 20370000
+    },
+    {
+      "average_id": "AVG-0002",
+      "service_id": "SVC-CARD",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1358000,
+      "daily_avg_tx_value_eur": 60140000
+    },
+    {
+      "average_id": "AVG-0003",
+      "service_id": "SVC-DERIV",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2910,
+      "daily_avg_tx_value_eur": 2328000000
+    },
+    {
+      "average_id": "AVG-0004",
+      "service_id": "SVC-HVP",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2328,
+      "daily_avg_tx_value_eur": 9312000000
+    },
+    {
+      "average_id": "AVG-0005",
+      "service_id": "SVC-MOB",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 155200,
+      "daily_avg_tx_value_eur": 36860000
+    },
+    {
+      "average_id": "AVG-0006",
+      "service_id": "SVC-OLB",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 203700,
+      "daily_avg_tx_value_eur": 92150000
+    },
+    {
+      "average_id": "AVG-0007",
+      "service_id": "SVC-PHONE",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8730,
+      "daily_avg_tx_value_eur": 5820000
+    },
+    {
+      "average_id": "AVG-0008",
+      "service_id": "SVC-SEC",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8730,
+      "daily_avg_tx_value_eur": 1067000000
+    },
+    {
+      "average_id": "AVG-0009",
+      "service_id": "SVC-SEPA",
+      "month": "2025-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 582000,
+      "daily_avg_tx_value_eur": 795400000
+    },
+    {
+      "average_id": "AVG-0010",
+      "service_id": "SVC-ATM",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 176400,
+      "daily_avg_tx_value_eur": 20580000
+    },
+    {
+      "average_id": "AVG-0011",
+      "service_id": "SVC-CARD",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 1372000,
+      "daily_avg_tx_value_eur": 60760000
+    },
+    {
+      "average_id": "AVG-0012",
+      "service_id": "SVC-DERIV",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 2940,
+      "daily_avg_tx_value_eur": 2352000000
+    },
+    {
+      "average_id": "AVG-0013",
+      "service_id": "SVC-HVP",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 2352,
+      "daily_avg_tx_value_eur": 9408000000
+    },
+    {
+      "average_id": "AVG-0014",
+      "service_id": "SVC-MOB",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 156800,
+      "daily_avg_tx_value_eur": 37240000
+    },
+    {
+      "average_id": "AVG-0015",
+      "service_id": "SVC-OLB",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 205800,
+      "daily_avg_tx_value_eur": 93100000
+    },
+    {
+      "average_id": "AVG-0016",
+      "service_id": "SVC-PHONE",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 8820,
+      "daily_avg_tx_value_eur": 5880000
+    },
+    {
+      "average_id": "AVG-0017",
+      "service_id": "SVC-SEC",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 8820,
+      "daily_avg_tx_value_eur": 1078000000
+    },
+    {
+      "average_id": "AVG-0018",
+      "service_id": "SVC-SEPA",
+      "month": "2025-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 588000,
+      "daily_avg_tx_value_eur": 803600000
+    },
+    {
+      "average_id": "AVG-0019",
+      "service_id": "SVC-ATM",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 180000,
+      "daily_avg_tx_value_eur": 21000000
+    },
+    {
+      "average_id": "AVG-0020",
+      "service_id": "SVC-CARD",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1400000,
+      "daily_avg_tx_value_eur": 62000000
+    },
+    {
+      "average_id": "AVG-0021",
+      "service_id": "SVC-DERIV",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3000,
+      "daily_avg_tx_value_eur": 2400000000
+    },
+    {
+      "average_id": "AVG-0022",
+      "service_id": "SVC-HVP",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2400,
+      "daily_avg_tx_value_eur": 9600000000
+    },
+    {
+      "average_id": "AVG-0023",
+      "service_id": "SVC-MOB",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 160000,
+      "daily_avg_tx_value_eur": 38000000
+    },
+    {
+      "average_id": "AVG-0024",
+      "service_id": "SVC-OLB",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 210000,
+      "daily_avg_tx_value_eur": 95000000
+    },
+    {
+      "average_id": "AVG-0025",
+      "service_id": "SVC-PHONE",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9000,
+      "daily_avg_tx_value_eur": 6000000
+    },
+    {
+      "average_id": "AVG-0026",
+      "service_id": "SVC-SEC",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9000,
+      "daily_avg_tx_value_eur": 1100000000
+    },
+    {
+      "average_id": "AVG-0027",
+      "service_id": "SVC-SEPA",
+      "month": "2025-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 600000,
+      "daily_avg_tx_value_eur": 820000000
+    },
+    {
+      "average_id": "AVG-0028",
+      "service_id": "SVC-ATM",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 181800,
+      "daily_avg_tx_value_eur": 21210000
+    },
+    {
+      "average_id": "AVG-0029",
+      "service_id": "SVC-CARD",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1414000,
+      "daily_avg_tx_value_eur": 62620000
+    },
+    {
+      "average_id": "AVG-0030",
+      "service_id": "SVC-DERIV",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3030,
+      "daily_avg_tx_value_eur": 2424000000
+    },
+    {
+      "average_id": "AVG-0031",
+      "service_id": "SVC-HVP",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2424,
+      "daily_avg_tx_value_eur": 9696000000
+    },
+    {
+      "average_id": "AVG-0032",
+      "service_id": "SVC-MOB",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 161600,
+      "daily_avg_tx_value_eur": 38380000
+    },
+    {
+      "average_id": "AVG-0033",
+      "service_id": "SVC-OLB",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 212100,
+      "daily_avg_tx_value_eur": 95950000
+    },
+    {
+      "average_id": "AVG-0034",
+      "service_id": "SVC-PHONE",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9090,
+      "daily_avg_tx_value_eur": 6060000
+    },
+    {
+      "average_id": "AVG-0035",
+      "service_id": "SVC-SEC",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9090,
+      "daily_avg_tx_value_eur": 1111000000
+    },
+    {
+      "average_id": "AVG-0036",
+      "service_id": "SVC-SEPA",
+      "month": "2025-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 606000,
+      "daily_avg_tx_value_eur": 828200000
+    },
+    {
+      "average_id": "AVG-0037",
+      "service_id": "SVC-ATM",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 183600,
+      "daily_avg_tx_value_eur": 21420000
+    },
+    {
+      "average_id": "AVG-0038",
+      "service_id": "SVC-CARD",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1428000,
+      "daily_avg_tx_value_eur": 63240000
+    },
+    {
+      "average_id": "AVG-0039",
+      "service_id": "SVC-DERIV",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3060,
+      "daily_avg_tx_value_eur": 2448000000
+    },
+    {
+      "average_id": "AVG-0040",
+      "service_id": "SVC-HVP",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2448,
+      "daily_avg_tx_value_eur": 9792000000
+    },
+    {
+      "average_id": "AVG-0041",
+      "service_id": "SVC-MOB",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 163200,
+      "daily_avg_tx_value_eur": 38760000
+    },
+    {
+      "average_id": "AVG-0042",
+      "service_id": "SVC-OLB",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 214200,
+      "daily_avg_tx_value_eur": 96900000
+    },
+    {
+      "average_id": "AVG-0043",
+      "service_id": "SVC-PHONE",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 6120000
+    },
+    {
+      "average_id": "AVG-0044",
+      "service_id": "SVC-SEC",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 1122000000
+    },
+    {
+      "average_id": "AVG-0045",
+      "service_id": "SVC-SEPA",
+      "month": "2025-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 612000,
+      "daily_avg_tx_value_eur": 836400000
+    },
+    {
+      "average_id": "AVG-0046",
+      "service_id": "SVC-ATM",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 180000,
+      "daily_avg_tx_value_eur": 21000000
+    },
+    {
+      "average_id": "AVG-0047",
+      "service_id": "SVC-CARD",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1400000,
+      "daily_avg_tx_value_eur": 62000000
+    },
+    {
+      "average_id": "AVG-0048",
+      "service_id": "SVC-DERIV",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3000,
+      "daily_avg_tx_value_eur": 2400000000
+    },
+    {
+      "average_id": "AVG-0049",
+      "service_id": "SVC-HVP",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2400,
+      "daily_avg_tx_value_eur": 9600000000
+    },
+    {
+      "average_id": "AVG-0050",
+      "service_id": "SVC-MOB",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 160000,
+      "daily_avg_tx_value_eur": 38000000
+    },
+    {
+      "average_id": "AVG-0051",
+      "service_id": "SVC-OLB",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 210000,
+      "daily_avg_tx_value_eur": 95000000
+    },
+    {
+      "average_id": "AVG-0052",
+      "service_id": "SVC-PHONE",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9000,
+      "daily_avg_tx_value_eur": 6000000
+    },
+    {
+      "average_id": "AVG-0053",
+      "service_id": "SVC-SEC",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9000,
+      "daily_avg_tx_value_eur": 1100000000
+    },
+    {
+      "average_id": "AVG-0054",
+      "service_id": "SVC-SEPA",
+      "month": "2025-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 600000,
+      "daily_avg_tx_value_eur": 820000000
+    },
+    {
+      "average_id": "AVG-0055",
+      "service_id": "SVC-ATM",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 178200,
+      "daily_avg_tx_value_eur": 20790000
+    },
+    {
+      "average_id": "AVG-0056",
+      "service_id": "SVC-CARD",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1386000,
+      "daily_avg_tx_value_eur": 61380000
+    },
+    {
+      "average_id": "AVG-0057",
+      "service_id": "SVC-DERIV",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2970,
+      "daily_avg_tx_value_eur": 2376000000
+    },
+    {
+      "average_id": "AVG-0058",
+      "service_id": "SVC-HVP",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2376,
+      "daily_avg_tx_value_eur": 9504000000
+    },
+    {
+      "average_id": "AVG-0059",
+      "service_id": "SVC-MOB",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 158400,
+      "daily_avg_tx_value_eur": 37620000
+    },
+    {
+      "average_id": "AVG-0060",
+      "service_id": "SVC-OLB",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 207900,
+      "daily_avg_tx_value_eur": 94050000
+    },
+    {
+      "average_id": "AVG-0061",
+      "service_id": "SVC-PHONE",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8910,
+      "daily_avg_tx_value_eur": 5940000
+    },
+    {
+      "average_id": "AVG-0062",
+      "service_id": "SVC-SEC",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8910,
+      "daily_avg_tx_value_eur": 1089000000
+    },
+    {
+      "average_id": "AVG-0063",
+      "service_id": "SVC-SEPA",
+      "month": "2025-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 594000,
+      "daily_avg_tx_value_eur": 811800000
+    },
+    {
+      "average_id": "AVG-0064",
+      "service_id": "SVC-ATM",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 172800,
+      "daily_avg_tx_value_eur": 20160000
+    },
+    {
+      "average_id": "AVG-0065",
+      "service_id": "SVC-CARD",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1344000,
+      "daily_avg_tx_value_eur": 59520000
+    },
+    {
+      "average_id": "AVG-0066",
+      "service_id": "SVC-DERIV",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2880,
+      "daily_avg_tx_value_eur": 2304000000
+    },
+    {
+      "average_id": "AVG-0067",
+      "service_id": "SVC-HVP",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2304,
+      "daily_avg_tx_value_eur": 9216000000
+    },
+    {
+      "average_id": "AVG-0068",
+      "service_id": "SVC-MOB",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 153600,
+      "daily_avg_tx_value_eur": 36480000
+    },
+    {
+      "average_id": "AVG-0069",
+      "service_id": "SVC-OLB",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 201600,
+      "daily_avg_tx_value_eur": 91200000
+    },
+    {
+      "average_id": "AVG-0070",
+      "service_id": "SVC-PHONE",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8640,
+      "daily_avg_tx_value_eur": 5760000
+    },
+    {
+      "average_id": "AVG-0071",
+      "service_id": "SVC-SEC",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8640,
+      "daily_avg_tx_value_eur": 1056000000
+    },
+    {
+      "average_id": "AVG-0072",
+      "service_id": "SVC-SEPA",
+      "month": "2025-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 576000,
+      "daily_avg_tx_value_eur": 787200000
+    },
+    {
+      "average_id": "AVG-0073",
+      "service_id": "SVC-ATM",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 181800,
+      "daily_avg_tx_value_eur": 21210000
+    },
+    {
+      "average_id": "AVG-0074",
+      "service_id": "SVC-CARD",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1414000,
+      "daily_avg_tx_value_eur": 62620000
+    },
+    {
+      "average_id": "AVG-0075",
+      "service_id": "SVC-DERIV",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3030,
+      "daily_avg_tx_value_eur": 2424000000
+    },
+    {
+      "average_id": "AVG-0076",
+      "service_id": "SVC-HVP",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2424,
+      "daily_avg_tx_value_eur": 9696000000
+    },
+    {
+      "average_id": "AVG-0077",
+      "service_id": "SVC-MOB",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 161600,
+      "daily_avg_tx_value_eur": 38380000
+    },
+    {
+      "average_id": "AVG-0078",
+      "service_id": "SVC-OLB",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 212100,
+      "daily_avg_tx_value_eur": 95950000
+    },
+    {
+      "average_id": "AVG-0079",
+      "service_id": "SVC-PHONE",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9090,
+      "daily_avg_tx_value_eur": 6060000
+    },
+    {
+      "average_id": "AVG-0080",
+      "service_id": "SVC-SEC",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9090,
+      "daily_avg_tx_value_eur": 1111000000
+    },
+    {
+      "average_id": "AVG-0081",
+      "service_id": "SVC-SEPA",
+      "month": "2025-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 606000,
+      "daily_avg_tx_value_eur": 828200000
+    },
+    {
+      "average_id": "AVG-0082",
+      "service_id": "SVC-ATM",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 183600,
+      "daily_avg_tx_value_eur": 21420000
+    },
+    {
+      "average_id": "AVG-0083",
+      "service_id": "SVC-CARD",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1428000,
+      "daily_avg_tx_value_eur": 63240000
+    },
+    {
+      "average_id": "AVG-0084",
+      "service_id": "SVC-DERIV",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3060,
+      "daily_avg_tx_value_eur": 2448000000
+    },
+    {
+      "average_id": "AVG-0085",
+      "service_id": "SVC-HVP",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2448,
+      "daily_avg_tx_value_eur": 9792000000
+    },
+    {
+      "average_id": "AVG-0086",
+      "service_id": "SVC-MOB",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 163200,
+      "daily_avg_tx_value_eur": 38760000
+    },
+    {
+      "average_id": "AVG-0087",
+      "service_id": "SVC-OLB",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 214200,
+      "daily_avg_tx_value_eur": 96900000
+    },
+    {
+      "average_id": "AVG-0088",
+      "service_id": "SVC-PHONE",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 6120000
+    },
+    {
+      "average_id": "AVG-0089",
+      "service_id": "SVC-SEC",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 1122000000
+    },
+    {
+      "average_id": "AVG-0090",
+      "service_id": "SVC-SEPA",
+      "month": "2025-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 612000,
+      "daily_avg_tx_value_eur": 836400000
+    },
+    {
+      "average_id": "AVG-0091",
+      "service_id": "SVC-ATM",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 185400,
+      "daily_avg_tx_value_eur": 21630000
+    },
+    {
+      "average_id": "AVG-0092",
+      "service_id": "SVC-CARD",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1442000,
+      "daily_avg_tx_value_eur": 63860000
+    },
+    {
+      "average_id": "AVG-0093",
+      "service_id": "SVC-DERIV",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3090,
+      "daily_avg_tx_value_eur": 2472000000
+    },
+    {
+      "average_id": "AVG-0094",
+      "service_id": "SVC-HVP",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2472,
+      "daily_avg_tx_value_eur": 9888000000
+    },
+    {
+      "average_id": "AVG-0095",
+      "service_id": "SVC-MOB",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 164800,
+      "daily_avg_tx_value_eur": 39140000
+    },
+    {
+      "average_id": "AVG-0096",
+      "service_id": "SVC-OLB",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 216300,
+      "daily_avg_tx_value_eur": 97850000
+    },
+    {
+      "average_id": "AVG-0097",
+      "service_id": "SVC-PHONE",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9270,
+      "daily_avg_tx_value_eur": 6180000
+    },
+    {
+      "average_id": "AVG-0098",
+      "service_id": "SVC-SEC",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9270,
+      "daily_avg_tx_value_eur": 1133000000
+    },
+    {
+      "average_id": "AVG-0099",
+      "service_id": "SVC-SEPA",
+      "month": "2025-11",
+      "days_counted": 30,
+      "daily_avg_tx_count": 618000,
+      "daily_avg_tx_value_eur": 844600000
+    },
+    {
+      "average_id": "AVG-0100",
+      "service_id": "SVC-ATM",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 189000,
+      "daily_avg_tx_value_eur": 22050000
+    },
+    {
+      "average_id": "AVG-0101",
+      "service_id": "SVC-CARD",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1470000,
+      "daily_avg_tx_value_eur": 65100000
+    },
+    {
+      "average_id": "AVG-0102",
+      "service_id": "SVC-DERIV",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3150,
+      "daily_avg_tx_value_eur": 2520000000
+    },
+    {
+      "average_id": "AVG-0103",
+      "service_id": "SVC-HVP",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2520,
+      "daily_avg_tx_value_eur": 10080000000
+    },
+    {
+      "average_id": "AVG-0104",
+      "service_id": "SVC-MOB",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 168000,
+      "daily_avg_tx_value_eur": 39900000
+    },
+    {
+      "average_id": "AVG-0105",
+      "service_id": "SVC-OLB",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 220500,
+      "daily_avg_tx_value_eur": 99750000
+    },
+    {
+      "average_id": "AVG-0106",
+      "service_id": "SVC-PHONE",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9450,
+      "daily_avg_tx_value_eur": 6300000
+    },
+    {
+      "average_id": "AVG-0107",
+      "service_id": "SVC-SEC",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9450,
+      "daily_avg_tx_value_eur": 1155000000
+    },
+    {
+      "average_id": "AVG-0108",
+      "service_id": "SVC-SEPA",
+      "month": "2025-12",
+      "days_counted": 31,
+      "daily_avg_tx_count": 630000,
+      "daily_avg_tx_value_eur": 861000000
+    },
+    {
+      "average_id": "AVG-0109",
+      "service_id": "SVC-ATM",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 178092,
+      "daily_avg_tx_value_eur": 20777400
+    },
+    {
+      "average_id": "AVG-0110",
+      "service_id": "SVC-CARD",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1385160,
+      "daily_avg_tx_value_eur": 61342800
+    },
+    {
+      "average_id": "AVG-0111",
+      "service_id": "SVC-DERIV",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2968,
+      "daily_avg_tx_value_eur": 2374560000
+    },
+    {
+      "average_id": "AVG-0112",
+      "service_id": "SVC-HVP",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2375,
+      "daily_avg_tx_value_eur": 9498240000
+    },
+    {
+      "average_id": "AVG-0113",
+      "service_id": "SVC-MOB",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 158304,
+      "daily_avg_tx_value_eur": 37597200
+    },
+    {
+      "average_id": "AVG-0114",
+      "service_id": "SVC-OLB",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 207774,
+      "daily_avg_tx_value_eur": 93993000
+    },
+    {
+      "average_id": "AVG-0115",
+      "service_id": "SVC-PHONE",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8905,
+      "daily_avg_tx_value_eur": 5936400
+    },
+    {
+      "average_id": "AVG-0116",
+      "service_id": "SVC-SEC",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8905,
+      "daily_avg_tx_value_eur": 1088340000
+    },
+    {
+      "average_id": "AVG-0117",
+      "service_id": "SVC-SEPA",
+      "month": "2026-01",
+      "days_counted": 31,
+      "daily_avg_tx_count": 593640,
+      "daily_avg_tx_value_eur": 811308000
+    },
+    {
+      "average_id": "AVG-0118",
+      "service_id": "SVC-ATM",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 179928,
+      "daily_avg_tx_value_eur": 20991600
+    },
+    {
+      "average_id": "AVG-0119",
+      "service_id": "SVC-CARD",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 1399440,
+      "daily_avg_tx_value_eur": 61975200
+    },
+    {
+      "average_id": "AVG-0120",
+      "service_id": "SVC-DERIV",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 2999,
+      "daily_avg_tx_value_eur": 2399040000
+    },
+    {
+      "average_id": "AVG-0121",
+      "service_id": "SVC-HVP",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 2399,
+      "daily_avg_tx_value_eur": 9596160000
+    },
+    {
+      "average_id": "AVG-0122",
+      "service_id": "SVC-MOB",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 159936,
+      "daily_avg_tx_value_eur": 37984800
+    },
+    {
+      "average_id": "AVG-0123",
+      "service_id": "SVC-OLB",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 209916,
+      "daily_avg_tx_value_eur": 94962000
+    },
+    {
+      "average_id": "AVG-0124",
+      "service_id": "SVC-PHONE",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 8996,
+      "daily_avg_tx_value_eur": 5997600
+    },
+    {
+      "average_id": "AVG-0125",
+      "service_id": "SVC-SEC",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 8996,
+      "daily_avg_tx_value_eur": 1099560000
+    },
+    {
+      "average_id": "AVG-0126",
+      "service_id": "SVC-SEPA",
+      "month": "2026-02",
+      "days_counted": 28,
+      "daily_avg_tx_count": 599760,
+      "daily_avg_tx_value_eur": 819672000
+    },
+    {
+      "average_id": "AVG-0127",
+      "service_id": "SVC-ATM",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 183600,
+      "daily_avg_tx_value_eur": 21420000
+    },
+    {
+      "average_id": "AVG-0128",
+      "service_id": "SVC-CARD",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1428000,
+      "daily_avg_tx_value_eur": 63240000
+    },
+    {
+      "average_id": "AVG-0129",
+      "service_id": "SVC-DERIV",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3060,
+      "daily_avg_tx_value_eur": 2448000000
+    },
+    {
+      "average_id": "AVG-0130",
+      "service_id": "SVC-HVP",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2448,
+      "daily_avg_tx_value_eur": 9792000000
+    },
+    {
+      "average_id": "AVG-0131",
+      "service_id": "SVC-MOB",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 163200,
+      "daily_avg_tx_value_eur": 38760000
+    },
+    {
+      "average_id": "AVG-0132",
+      "service_id": "SVC-OLB",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 214200,
+      "daily_avg_tx_value_eur": 96900000
+    },
+    {
+      "average_id": "AVG-0133",
+      "service_id": "SVC-PHONE",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 6120000
+    },
+    {
+      "average_id": "AVG-0134",
+      "service_id": "SVC-SEC",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 1122000000
+    },
+    {
+      "average_id": "AVG-0135",
+      "service_id": "SVC-SEPA",
+      "month": "2026-03",
+      "days_counted": 31,
+      "daily_avg_tx_count": 612000,
+      "daily_avg_tx_value_eur": 836400000
+    },
+    {
+      "average_id": "AVG-0136",
+      "service_id": "SVC-ATM",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 185436,
+      "daily_avg_tx_value_eur": 21634200
+    },
+    {
+      "average_id": "AVG-0137",
+      "service_id": "SVC-CARD",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1442280,
+      "daily_avg_tx_value_eur": 63872400
+    },
+    {
+      "average_id": "AVG-0138",
+      "service_id": "SVC-DERIV",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3091,
+      "daily_avg_tx_value_eur": 2472480000
+    },
+    {
+      "average_id": "AVG-0139",
+      "service_id": "SVC-HVP",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2472,
+      "daily_avg_tx_value_eur": 9889920000
+    },
+    {
+      "average_id": "AVG-0140",
+      "service_id": "SVC-MOB",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 164832,
+      "daily_avg_tx_value_eur": 39147600
+    },
+    {
+      "average_id": "AVG-0141",
+      "service_id": "SVC-OLB",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 216342,
+      "daily_avg_tx_value_eur": 97869000
+    },
+    {
+      "average_id": "AVG-0142",
+      "service_id": "SVC-PHONE",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9272,
+      "daily_avg_tx_value_eur": 6181200
+    },
+    {
+      "average_id": "AVG-0143",
+      "service_id": "SVC-SEC",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9272,
+      "daily_avg_tx_value_eur": 1133220000
+    },
+    {
+      "average_id": "AVG-0144",
+      "service_id": "SVC-SEPA",
+      "month": "2026-04",
+      "days_counted": 30,
+      "daily_avg_tx_count": 618120,
+      "daily_avg_tx_value_eur": 844764000
+    },
+    {
+      "average_id": "AVG-0145",
+      "service_id": "SVC-ATM",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 187272,
+      "daily_avg_tx_value_eur": 21848400
+    },
+    {
+      "average_id": "AVG-0146",
+      "service_id": "SVC-CARD",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1456560,
+      "daily_avg_tx_value_eur": 64504800
+    },
+    {
+      "average_id": "AVG-0147",
+      "service_id": "SVC-DERIV",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3121,
+      "daily_avg_tx_value_eur": 2496960000
+    },
+    {
+      "average_id": "AVG-0148",
+      "service_id": "SVC-HVP",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2497,
+      "daily_avg_tx_value_eur": 9987840000
+    },
+    {
+      "average_id": "AVG-0149",
+      "service_id": "SVC-MOB",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 166464,
+      "daily_avg_tx_value_eur": 39535200
+    },
+    {
+      "average_id": "AVG-0150",
+      "service_id": "SVC-OLB",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 218484,
+      "daily_avg_tx_value_eur": 98838000
+    },
+    {
+      "average_id": "AVG-0151",
+      "service_id": "SVC-PHONE",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9364,
+      "daily_avg_tx_value_eur": 6242400
+    },
+    {
+      "average_id": "AVG-0152",
+      "service_id": "SVC-SEC",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9364,
+      "daily_avg_tx_value_eur": 1144440000
+    },
+    {
+      "average_id": "AVG-0153",
+      "service_id": "SVC-SEPA",
+      "month": "2026-05",
+      "days_counted": 31,
+      "daily_avg_tx_count": 624240,
+      "daily_avg_tx_value_eur": 853128000
+    },
+    {
+      "average_id": "AVG-0154",
+      "service_id": "SVC-ATM",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 183600,
+      "daily_avg_tx_value_eur": 21420000
+    },
+    {
+      "average_id": "AVG-0155",
+      "service_id": "SVC-CARD",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1428000,
+      "daily_avg_tx_value_eur": 63240000
+    },
+    {
+      "average_id": "AVG-0156",
+      "service_id": "SVC-DERIV",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3060,
+      "daily_avg_tx_value_eur": 2448000000
+    },
+    {
+      "average_id": "AVG-0157",
+      "service_id": "SVC-HVP",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2448,
+      "daily_avg_tx_value_eur": 9792000000
+    },
+    {
+      "average_id": "AVG-0158",
+      "service_id": "SVC-MOB",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 163200,
+      "daily_avg_tx_value_eur": 38760000
+    },
+    {
+      "average_id": "AVG-0159",
+      "service_id": "SVC-OLB",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 214200,
+      "daily_avg_tx_value_eur": 96900000
+    },
+    {
+      "average_id": "AVG-0160",
+      "service_id": "SVC-PHONE",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 6120000
+    },
+    {
+      "average_id": "AVG-0161",
+      "service_id": "SVC-SEC",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9180,
+      "daily_avg_tx_value_eur": 1122000000
+    },
+    {
+      "average_id": "AVG-0162",
+      "service_id": "SVC-SEPA",
+      "month": "2026-06",
+      "days_counted": 30,
+      "daily_avg_tx_count": 612000,
+      "daily_avg_tx_value_eur": 836400000
+    },
+    {
+      "average_id": "AVG-0163",
+      "service_id": "SVC-ATM",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 181764,
+      "daily_avg_tx_value_eur": 21205800
+    },
+    {
+      "average_id": "AVG-0164",
+      "service_id": "SVC-CARD",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1413720,
+      "daily_avg_tx_value_eur": 62607600
+    },
+    {
+      "average_id": "AVG-0165",
+      "service_id": "SVC-DERIV",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3029,
+      "daily_avg_tx_value_eur": 2423520000
+    },
+    {
+      "average_id": "AVG-0166",
+      "service_id": "SVC-HVP",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2424,
+      "daily_avg_tx_value_eur": 9694080000
+    },
+    {
+      "average_id": "AVG-0167",
+      "service_id": "SVC-MOB",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 161568,
+      "daily_avg_tx_value_eur": 38372400
+    },
+    {
+      "average_id": "AVG-0168",
+      "service_id": "SVC-OLB",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 212058,
+      "daily_avg_tx_value_eur": 95931000
+    },
+    {
+      "average_id": "AVG-0169",
+      "service_id": "SVC-PHONE",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9088,
+      "daily_avg_tx_value_eur": 6058800
+    },
+    {
+      "average_id": "AVG-0170",
+      "service_id": "SVC-SEC",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9088,
+      "daily_avg_tx_value_eur": 1110780000
+    },
+    {
+      "average_id": "AVG-0171",
+      "service_id": "SVC-SEPA",
+      "month": "2026-07",
+      "days_counted": 31,
+      "daily_avg_tx_count": 605880,
+      "daily_avg_tx_value_eur": 828036000
+    },
+    {
+      "average_id": "AVG-0172",
+      "service_id": "SVC-ATM",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 176256,
+      "daily_avg_tx_value_eur": 20563200
+    },
+    {
+      "average_id": "AVG-0173",
+      "service_id": "SVC-CARD",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1370880,
+      "daily_avg_tx_value_eur": 60710400
+    },
+    {
+      "average_id": "AVG-0174",
+      "service_id": "SVC-DERIV",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2938,
+      "daily_avg_tx_value_eur": 2350080000
+    },
+    {
+      "average_id": "AVG-0175",
+      "service_id": "SVC-HVP",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2350,
+      "daily_avg_tx_value_eur": 9400320000
+    },
+    {
+      "average_id": "AVG-0176",
+      "service_id": "SVC-MOB",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 156672,
+      "daily_avg_tx_value_eur": 37209600
+    },
+    {
+      "average_id": "AVG-0177",
+      "service_id": "SVC-OLB",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 205632,
+      "daily_avg_tx_value_eur": 93024000
+    },
+    {
+      "average_id": "AVG-0178",
+      "service_id": "SVC-PHONE",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8813,
+      "daily_avg_tx_value_eur": 5875200
+    },
+    {
+      "average_id": "AVG-0179",
+      "service_id": "SVC-SEC",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 8813,
+      "daily_avg_tx_value_eur": 1077120000
+    },
+    {
+      "average_id": "AVG-0180",
+      "service_id": "SVC-SEPA",
+      "month": "2026-08",
+      "days_counted": 31,
+      "daily_avg_tx_count": 587520,
+      "daily_avg_tx_value_eur": 802944000
+    },
+    {
+      "average_id": "AVG-0181",
+      "service_id": "SVC-ATM",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 185436,
+      "daily_avg_tx_value_eur": 21634200
+    },
+    {
+      "average_id": "AVG-0182",
+      "service_id": "SVC-CARD",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 1442280,
+      "daily_avg_tx_value_eur": 63872400
+    },
+    {
+      "average_id": "AVG-0183",
+      "service_id": "SVC-DERIV",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 3091,
+      "daily_avg_tx_value_eur": 2472480000
+    },
+    {
+      "average_id": "AVG-0184",
+      "service_id": "SVC-HVP",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 2472,
+      "daily_avg_tx_value_eur": 9889920000
+    },
+    {
+      "average_id": "AVG-0185",
+      "service_id": "SVC-MOB",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 164832,
+      "daily_avg_tx_value_eur": 39147600
+    },
+    {
+      "average_id": "AVG-0186",
+      "service_id": "SVC-OLB",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 216342,
+      "daily_avg_tx_value_eur": 97869000
+    },
+    {
+      "average_id": "AVG-0187",
+      "service_id": "SVC-PHONE",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9272,
+      "daily_avg_tx_value_eur": 6181200
+    },
+    {
+      "average_id": "AVG-0188",
+      "service_id": "SVC-SEC",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 9272,
+      "daily_avg_tx_value_eur": 1133220000
+    },
+    {
+      "average_id": "AVG-0189",
+      "service_id": "SVC-SEPA",
+      "month": "2026-09",
+      "days_counted": 30,
+      "daily_avg_tx_count": 618120,
+      "daily_avg_tx_value_eur": 844764000
+    },
+    {
+      "average_id": "AVG-0190",
+      "service_id": "SVC-ATM",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 187272,
+      "daily_avg_tx_value_eur": 21848400
+    },
+    {
+      "average_id": "AVG-0191",
+      "service_id": "SVC-CARD",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 1456560,
+      "daily_avg_tx_value_eur": 64504800
+    },
+    {
+      "average_id": "AVG-0192",
+      "service_id": "SVC-DERIV",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 3121,
+      "daily_avg_tx_value_eur": 2496960000
+    },
+    {
+      "average_id": "AVG-0193",
+      "service_id": "SVC-HVP",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 2497,
+      "daily_avg_tx_value_eur": 9987840000
+    },
+    {
+      "average_id": "AVG-0194",
+      "service_id": "SVC-MOB",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 166464,
+      "daily_avg_tx_value_eur": 39535200
+    },
+    {
+      "average_id": "AVG-0195",
+      "service_id": "SVC-OLB",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 218484,
+      "daily_avg_tx_value_eur": 98838000
+    },
+    {
+      "average_id": "AVG-0196",
+      "service_id": "SVC-PHONE",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9364,
+      "daily_avg_tx_value_eur": 6242400
+    },
+    {
+      "average_id": "AVG-0197",
+      "service_id": "SVC-SEC",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 9364,
+      "daily_avg_tx_value_eur": 1144440000
+    },
+    {
+      "average_id": "AVG-0198",
+      "service_id": "SVC-SEPA",
+      "month": "2026-10",
+      "days_counted": 31,
+      "daily_avg_tx_count": 624240,
+      "daily_avg_tx_value_eur": 853128000
+    }
+  ]
+}

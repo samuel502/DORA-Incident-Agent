@@ -1,0 +1,159 @@
+{
+  "about": "SYNTHETIC DATA. Clients and counterparts per service (simulated core banking), yearly snapshots of Rheinbank AG, a fictional bank. No real bank or customer data.",
+  "snapshots": [
+    {
+      "snapshot_id": "CLB-0001",
+      "service_id": "SVC-ATM",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 690000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0002",
+      "service_id": "SVC-CARD",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 920000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0003",
+      "service_id": "SVC-CORE",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 1150000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0004",
+      "service_id": "SVC-DERIV",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 1150,
+      "active_counterparts": 38
+    },
+    {
+      "snapshot_id": "CLB-0005",
+      "service_id": "SVC-HVP",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 3300,
+      "active_counterparts": 115
+    },
+    {
+      "snapshot_id": "CLB-0006",
+      "service_id": "SVC-LOAN",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 540000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0007",
+      "service_id": "SVC-MOB",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 360000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0008",
+      "service_id": "SVC-OLB",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 870000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0009",
+      "service_id": "SVC-PHONE",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 260000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0010",
+      "service_id": "SVC-SEC",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 82000,
+      "active_counterparts": 58
+    },
+    {
+      "snapshot_id": "CLB-0011",
+      "service_id": "SVC-SEPA",
+      "as_of": "2024-12-31",
+      "total_clients_using_service": 1080000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0012",
+      "service_id": "SVC-ATM",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 700000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0013",
+      "service_id": "SVC-CARD",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 950000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0014",
+      "service_id": "SVC-CORE",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 1200000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0015",
+      "service_id": "SVC-DERIV",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 1200,
+      "active_counterparts": 40
+    },
+    {
+      "snapshot_id": "CLB-0016",
+      "service_id": "SVC-HVP",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 3500,
+      "active_counterparts": 120
+    },
+    {
+      "snapshot_id": "CLB-0017",
+      "service_id": "SVC-LOAN",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 600000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0018",
+      "service_id": "SVC-MOB",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 400000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0019",
+      "service_id": "SVC-OLB",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 900000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0020",
+      "service_id": "SVC-PHONE",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 250000,
+      "active_counterparts": null
+    },
+    {
+      "snapshot_id": "CLB-0021",
+      "service_id": "SVC-SEC",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 85000,
+      "active_counterparts": 60
+    },
+    {
+      "snapshot_id": "CLB-0022",
+      "service_id": "SVC-SEPA",
+      "as_of": "2025-12-31",
+      "total_clients_using_service": 1100000,
+      "active_counterparts": null
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Exact versions only, including the packages these pull in (security framework: pinned dependencies).
+# Hashes and an automatic pip-audit come in block 7.
+
+# Runtime
+pydantic==2.14.1
+pydantic-core==2.50.1
+annotated-types==0.8.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+
+# Tests
+pytest==9.1.1
+iniconfig==2.3.1
+pluggy==1.7.0
+packaging==24.2
+pygments==2.21.0
+colorama==0.4.6; sys_platform == "win32"

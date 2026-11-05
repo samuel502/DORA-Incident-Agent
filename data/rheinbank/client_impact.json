@@ -1,0 +1,342 @@
+{
+  "about": "SYNTHETIC DATA. Client impact per outage window (simulated core banking) of Rheinbank AG, a fictional bank. No real bank or customer data. null means the system does not know. All times UTC.",
+  "impacts": [
+    {
+      "impact_id": "IMP-0001",
+      "service_id": "SVC-OLB",
+      "window_start": "2025-02-15T21:00:00Z",
+      "window_end": "2025-05-23T15:00:00Z",
+      "affected_clients": 520000,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0002",
+      "service_id": "SVC-OLB",
+      "window_start": "2025-09-06T20:00:00Z",
+      "window_end": "2025-11-28T14:00:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0003",
+      "service_id": "SVC-DERIV",
+      "window_start": "2026-02-02T06:00:00Z",
+      "window_end": "2026-02-07T17:00:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": null,
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0004",
+      "service_id": "SVC-HVP",
+      "window_start": "2026-02-26T08:00:00Z",
+      "window_end": "2026-02-26T21:30:00Z",
+      "affected_clients": 900,
+      "affected_counterparts": 70,
+      "affected_tx_count": 1425,
+      "affected_tx_value_eur": 5888908800,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE",
+        "AT"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0005",
+      "service_id": "SVC-OLB",
+      "window_start": "2026-03-17T13:00:00Z",
+      "window_end": "2026-03-17T13:40:00Z",
+      "affected_clients": 27000,
+      "affected_counterparts": null,
+      "affected_tx_count": 2939,
+      "affected_tx_value_eur": 1329468,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "no",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0006",
+      "service_id": "SVC-LOAN",
+      "window_start": "2026-03-22T01:15:00Z",
+      "window_end": "2026-07-21T07:00:00Z",
+      "affected_clients": 210000,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": true,
+      "estimate_basis": "Applications stored in the exposed cloud storage."
+    },
+    {
+      "impact_id": "IMP-0007",
+      "service_id": "SVC-OLB",
+      "window_start": "2026-03-30T05:30:00Z",
+      "window_end": "2026-04-01T18:00:00Z",
+      "affected_clients": 45000,
+      "affected_counterparts": null,
+      "affected_tx_count": 117553,
+      "affected_tx_value_eur": 47481000,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0008",
+      "service_id": "SVC-SEPA",
+      "window_start": "2026-04-14T08:00:00Z",
+      "window_end": "2026-04-14T11:00:00Z",
+      "affected_clients": 22000,
+      "affected_counterparts": null,
+      "affected_tx_count": 24480,
+      "affected_tx_value_eur": 31783200,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "no",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0009",
+      "service_id": "SVC-OLB",
+      "window_start": "2026-04-30T14:30:00Z",
+      "window_end": "2026-05-06T10:00:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": null,
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0010",
+      "service_id": "SVC-SEC",
+      "window_start": "2026-05-12T01:00:00Z",
+      "window_end": "2026-05-14T16:00:00Z",
+      "affected_clients": 6500,
+      "affected_counterparts": 22,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE",
+        "AT"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0011",
+      "service_id": "SVC-OLB",
+      "window_start": "2026-05-26T07:10:00Z",
+      "window_end": "2026-05-26T12:40:00Z",
+      "affected_clients": 140000,
+      "affected_counterparts": null,
+      "affected_tx_count": 62739,
+      "affected_tx_value_eur": 27403320,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0012",
+      "service_id": "SVC-MFT",
+      "window_start": "2026-06-01T00:00:00Z",
+      "window_end": "2026-06-03T00:00:00Z",
+      "affected_clients": 180000,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0013",
+      "service_id": "SVC-CARD",
+      "window_start": "2026-06-01T12:35:00Z",
+      "window_end": "2026-06-01T22:45:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": 150026,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE",
+        "AT",
+        "NL",
+        "FR",
+        "ES"
+      ],
+      "is_estimate": true,
+      "estimate_basis": "Failed authorisations extrapolated from a card processor sample."
+    },
+    {
+      "impact_id": "IMP-0014",
+      "service_id": "SVC-CARD",
+      "window_start": "2026-06-13T10:00:00Z",
+      "window_end": "2026-06-13T11:30:00Z",
+      "affected_clients": 41000,
+      "affected_counterparts": null,
+      "affected_tx_count": 49523,
+      "affected_tx_value_eur": 2193163,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "no",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0015",
+      "service_id": "SVC-PAYOPS",
+      "window_start": "2026-07-16T04:10:00Z",
+      "window_end": "2026-07-16T09:10:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE",
+        "AT"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0016",
+      "service_id": "SVC-MOB",
+      "window_start": "2026-08-04T09:00:00Z",
+      "window_end": "2026-08-04T10:10:00Z",
+      "affected_clients": 40000,
+      "affected_counterparts": null,
+      "affected_tx_count": 6059,
+      "affected_tx_value_eur": 1381406,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "no",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0017",
+      "service_id": "SVC-OLB",
+      "window_start": "2026-08-18T15:00:00Z",
+      "window_end": "2026-08-18T23:30:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": 3800,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": [
+        "DE"
+      ],
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0018",
+      "service_id": "SVC-MFT",
+      "window_start": "2026-09-28T00:00:00Z",
+      "window_end": "2026-10-06T00:00:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": null,
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0019",
+      "service_id": "SVC-SEPA",
+      "window_start": "2026-10-01T07:30:00Z",
+      "window_end": "2026-10-05T16:00:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": null,
+      "is_estimate": false,
+      "estimate_basis": null
+    },
+    {
+      "impact_id": "IMP-0020",
+      "service_id": "SVC-OLB",
+      "window_start": "2026-10-21T10:00:00Z",
+      "window_end": "2026-10-21T21:30:00Z",
+      "affected_clients": null,
+      "affected_counterparts": null,
+      "affected_tx_count": null,
+      "affected_tx_value_eur": null,
+      "accounts_with_balance_errors": null,
+      "relevant_parties_affected": "unknown",
+      "affected_member_states": null,
+      "is_estimate": false,
+      "estimate_basis": null
+    }
+  ]
+}

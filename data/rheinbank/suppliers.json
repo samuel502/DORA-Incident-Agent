@@ -1,0 +1,93 @@
+{
+  "about": "SYNTHETIC DATA. Register of ICT third-party providers (simulated) of Rheinbank AG, a fictional bank. All supplier names are made up. No real bank or customer data.",
+  "suppliers": [
+    {
+      "supplier_id": "SUP-RITS",
+      "name": "Rhein IT Services GmbH",
+      "function_provided": "Data centre operations and hosting of core banking, digital channels, payments and email",
+      "country": "DE",
+      "services_provided": ["SVC-OLB", "SVC-MOB", "SVC-PHONE", "SVC-SEPA", "SVC-CORE", "SVC-MAIL"],
+      "member_states_served": ["DE"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "yes",
+      "contract_ref": "RIS-2021-004"
+    },
+    {
+      "supplier_id": "SUP-EUSET",
+      "name": "EuroSettle Platform",
+      "function_provided": "Euro large-value payment settlement (market infrastructure)",
+      "country": "DE",
+      "services_provided": ["SVC-HVP"],
+      "member_states_served": ["AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK"],
+      "is_market_infrastructure": true,
+      "supports_critical_function": "yes",
+      "contract_ref": "ESP-PART-0117"
+    },
+    {
+      "supplier_id": "SUP-CNET",
+      "name": "CardNet Europa B.V.",
+      "function_provided": "Card authorisation, clearing and ATM switching",
+      "country": "NL",
+      "services_provided": ["SVC-CARD", "SVC-ATM"],
+      "member_states_served": ["AT", "BE", "DE", "FR", "NL"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "yes",
+      "contract_ref": "CNE-2019-221"
+    },
+    {
+      "supplier_id": "SUP-CLRP",
+      "name": "ClearPath Systems Ltd",
+      "function_provided": "Hosted software for clearing exchange-traded derivatives",
+      "country": "IE",
+      "services_provided": ["SVC-DERIV"],
+      "member_states_served": ["DE", "FR", "IE", "IT", "NL"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "yes",
+      "contract_ref": "CPS-2022-031"
+    },
+    {
+      "supplier_id": "SUP-SDRP",
+      "name": "SecureDrop Transfer Inc.",
+      "function_provided": "Managed file transfer software",
+      "country": "US",
+      "services_provided": ["SVC-MFT"],
+      "member_states_served": ["DE", "FR", "NL"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "unknown",
+      "contract_ref": "SDT-2023-008"
+    },
+    {
+      "supplier_id": "SUP-FNSW",
+      "name": "Fintegra Software Ltd",
+      "function_provided": "File delivery platform for customers of its banking software",
+      "country": "GB",
+      "services_provided": ["SVC-MFT"],
+      "member_states_served": ["DE", "FR", "IT", "NL"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "unknown",
+      "contract_ref": "FSW-2020-117"
+    },
+    {
+      "supplier_id": "SUP-SHLD",
+      "name": "ShieldPoint Security Inc.",
+      "function_provided": "Endpoint security software on staff and operations devices",
+      "country": "US",
+      "services_provided": ["SVC-PAYOPS", "SVC-OFFICE"],
+      "member_states_served": ["AT", "DE", "ES", "FR", "IT", "NL"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "yes",
+      "contract_ref": "SPS-2024-002"
+    },
+    {
+      "supplier_id": "SUP-NMBS",
+      "name": "NimbusCloud Europe S.A.",
+      "function_provided": "Cloud hosting",
+      "country": "LU",
+      "services_provided": ["SVC-LOAN", "SVC-WEB"],
+      "member_states_served": ["DE", "FR", "LU"],
+      "is_market_infrastructure": false,
+      "supports_critical_function": "yes",
+      "contract_ref": "NCE-2022-044"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+# Settings for the Rheinbank DORA agent.
+# No secrets here. API keys come only from environment variables (CLAUDE.md hard rule 5).
+# Agent loop limits (max steps, max tool calls) are added in block 5.
+
+[connectors]
+# Longest search text the agent may send to find_service.
+max_query_chars = 100
+# Most matches find_service returns in one call.
+max_find_results = 5
+# Longest free-text note any connector returns. Longer notes are cut.
+max_text_chars = 500
+# Most records (problems, alerts, notices) any other lookup returns in one call.
+max_results = 10
+# get_outage_timeline searches at most this many hours before and after the given time.
+max_timeline_window_hours = 72
+# get_client_impact searches a window of at most this many days.
+max_impact_window_days = 366
+# get_security_alerts searches a window of at most this many days (by detection time).
+max_alert_window_days = 31
+# get_supplier_notices searches a window of at most this many days.
+max_notice_window_days = 366
