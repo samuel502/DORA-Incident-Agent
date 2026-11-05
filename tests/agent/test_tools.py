@@ -221,11 +221,8 @@ def test_run_rules_shows_conflicts():
         "Please check and correct if needed."]
 
 
-def test_tool_results_are_capped(monkeypatch):
-    import dora_agent.agent.tools as tools
-
-    monkeypatch.setattr(tools, "MAX_TOOL_RESULT_CHARS", 50)
-    box, _ = box_at()
+def test_tool_results_are_capped():
+    box = Toolbox(FactStore(), RunContext(reported_at=B01_REPORTED, as_of=B01_REPORTED), max_result_chars=50)
     outcome = run(box, "get_service", service_id="SVC-OLB")
     assert outcome.error == "result too large; narrow the search"
 

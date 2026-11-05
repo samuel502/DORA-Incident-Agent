@@ -28,12 +28,11 @@ from dora_agent.agent import mapping
 from dora_agent.agent.fact_store import FactStore
 from dora_agent.agent.questions import QUESTIONS
 from dora_agent.agent.values import ValueProblem
+from dora_agent.config import agent_limits
 from dora_agent.connectors import InvalidQuery
 from dora_agent.llm.provider import ToolCall, ToolSpec
 from dora_agent.rules import Classification, classify
 
-# Longest tool result (as JSON text) sent back to the LLM. Moves to config.toml [agent] in step 4.
-MAX_TOOL_RESULT_CHARS = 8000
 
 ServiceId = Field(pattern=r"^SVC-[A-Z]{2,8}$")
 SupplierId = Field(pattern=r"^SUP-[A-Z]{2,8}$")
@@ -129,6 +128,7 @@ class RunContext:
     adopted: dict[str, str] = field(default_factory=dict)  # kind -> record_id (one record per kind)
     pending_questions: list[str] = field(default_factory=list)
     last_classification: Classification | None = None
+    alerts_checked: bool = False  # used by the gate check in loop.py
 
 
 @dataclass(frozen=True)
@@ -139,10 +139,12 @@ class _Tool:
 
 
 class Toolbox:
-    def __init__(self, store: FactStore, context: RunContext):
+    def __init__(self, store: FactStore, context: RunContext, max_result_chars: int | None = None):
         self._store = store
         self._view = store.agent_view()  # the only way suggestions get in
         self.context = context
+        # Longest tool result (as JSON text) sent back to the LLM: config.toml [agent].
+        self._max_result_chars = max_result_chars or agent_limits().max_tool_result_chars
         self._tools = {tool.spec.name: tool for tool in _TOOLS}
 
     def specs(self) -> list[ToolSpec]:
@@ -165,7 +167,7 @@ class Toolbox:
         except (InvalidQuery, ValueProblem) as problem:
             return _refused(call.name, str(problem)[:300])
         text = json.dumps(outcome.content, default=str)
-        if len(text) > MAX_TOOL_RESULT_CHARS:
+        if len(text) > self._max_result_chars:
             return _refused(call.name, "result too large; narrow the search")
         return outcome
 
@@ -256,6 +258,7 @@ def _get_daily_averages(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
 
 def _get_security_alerts(box: Toolbox, args: AlertArgs) -> ToolOutcome:
     result = connectors.get_security_alerts(args.start, args.end, args.service_id)
+    box.context.alerts_checked = True
     service = box.context.incident_service
     relevant = [a for a in result.alerts if service is None or service in a.service_ids]
     # Alerts may be adopted before the service is known (case B03 starts with the SOC alert).

@@ -60,7 +60,7 @@ The agent has one goal: collect enough facts to classify the incident. It has a 
 Different incidents take different paths. Examples:
 
 - **"Online banking down since 9:10, customers can't log in."** Service list (critical), client data, monitoring, security alerts (nothing), run the rules. Major.
-- **"HR portal is slow this morning."** Service list (not critical), run the rules, stop. Not major, two steps.
+- **"HR portal is slow this morning."** Service list (not critical), security alerts (no successful access on record), one question to the human (was there a successful malicious access?), run the rules. Not major, about four steps. It can't stop after the service list, because a malicious access would pass the gate even for a non-critical service, and only a human may rule that out: a missing security alert alone is never enough.
 - **"SOC flagged a large data transfer at 2 a.m."** Security alerts first, then service list, then supplier register, then asks the human if customer data left the bank.
 
 A fixed script would run every step every time. The agent skips, digs deeper or asks, depending on the incident. The screen shows a trace of every step and why the agent took it.

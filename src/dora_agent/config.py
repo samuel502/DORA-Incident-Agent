@@ -79,3 +79,33 @@ def llm_settings() -> LlmSettings:
         timeout_seconds=section["timeout_seconds"], max_retries=retries,
         max_output_tokens=section["max_output_tokens"], temperature=float(temperature),
     )
+
+
+@dataclass(frozen=True)
+class AgentLimits:
+    """The [agent] section: hard limits on the agent loop (CLAUDE.md hard rule 8)."""
+
+    max_steps: int
+    max_tool_calls: int
+    max_tool_calls_per_step: int
+    max_human_rounds: int
+    max_ticket_chars: int
+    max_tool_result_chars: int
+    gate_check_alert_days_before: int
+    gate_check_alert_days_after: int
+
+
+@lru_cache(maxsize=1)
+def agent_limits() -> AgentLimits:
+    """Read the [agent] section once. Every value must be a positive whole number."""
+    with CONFIG_PATH.open("rb") as handle:
+        section = tomllib.load(handle)["agent"]
+    values = {}
+    for field in fields(AgentLimits):
+        value = section[field.name]
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise ValueError(f"config.toml [agent] {field.name} must be a positive integer")
+        values[field.name] = value
+    if values["gate_check_alert_days_before"] + values["gate_check_alert_days_after"] > 31:
+        raise ValueError("config.toml [agent] gate check alert window must be at most 31 days (connector limit)")
+    return AgentLimits(**values)

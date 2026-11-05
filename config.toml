@@ -1,6 +1,5 @@
 # Settings for the Rheinbank DORA agent.
 # No secrets here. API keys come only from environment variables (CLAUDE.md hard rule 5).
-# Agent loop limits (max steps, max tool calls) are added later in block 5.
 
 [connectors]
 # Longest search text the agent may send to find_service.
@@ -34,3 +33,22 @@ max_retries = 1
 max_output_tokens = 2000
 # 0 = as repeatable as possible.
 temperature = 0
+
+[agent]
+# Hard limits on the agent loop (CLAUDE.md hard rule 8). When one is reached, the run stops,
+# the rules engine gives its result on the facts so far, and the missing facts are listed.
+# Most LLM calls in one run.
+max_steps = 12
+# Most tool calls in one run, counted across all steps.
+max_tool_calls = 25
+# Most tool calls the LLM may propose in one answer. Extra ones are not run.
+max_tool_calls_per_step = 6
+# Most times one run may stop to ask the human.
+max_human_rounds = 3
+# Longest ticket accepted, in characters (security framework: input length limits).
+max_ticket_chars = 2000
+# Longest tool result sent back to the LLM, as JSON text.
+max_tool_result_chars = 8000
+# Security alert search around the reported time when the gate depends only on G-c (gate check).
+gate_check_alert_days_before = 7
+gate_check_alert_days_after = 1
