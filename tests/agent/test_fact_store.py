@@ -169,7 +169,79 @@ def test_system_never_overwrites_a_human_answer():
     store.human_desk().answer("critical_or_important", "yes", confirmed_by="Sam")
     store.record_system("critical_or_important", False, "service_list")
     assert store.snapshot().critical_or_important.confirmed_by == "Sam"
+    assert store.snapshot().usable("critical_or_important") is True
+
+
+def test_system_agreeing_with_the_human_is_no_conflict():
+    store = FactStore()
+    store.human_desk().answer("critical_or_important", "yes", confirmed_by="Sam")
+    store.record_system("critical_or_important", True, "service_list")
+    assert store.conflicts() == []
     assert store.events[-1].action == "system_ignored"
+    assert store.events[-1].note == "same as the human answer"
+
+
+# ---------- conflicts: human answer kept, disagreement flagged (Sam, block 5 step 2) ----------
+
+
+def test_conflict_when_system_reports_after_the_human():
+    store = FactStore()
+    store.human_desk().answer("critical_or_important", "no", confirmed_by="Sam")
+    store.record_system("critical_or_important", True, "service_list")
+    assert store.snapshot().usable("critical_or_important") is False  # the human answer is used
+    [conflict] = store.conflicts()
+    assert (conflict.fact_name, conflict.kept_value, conflict.kept_source, conflict.kept_by) == (
+        "critical_or_important", "False", "human", "Sam")
+    assert (conflict.system_value, conflict.system_source) == ("True", "service_list")
+    event = store.events[-1]
+    assert event.action == "conflict"
+    assert "service_list says True" in event.note and "confirmed by Sam" in event.note
+
+
+def test_conflict_when_human_answers_after_the_system():
+    # Security alert says the access was not successful; the human says it was.
+    store = FactStore()
+    store.record_system("malicious_access", False, "security_alerts")
+    store.human_desk().answer("malicious_access", "yes", confirmed_by="Sam")
+    assert store.snapshot().usable("malicious_access") is True
+    [conflict] = store.conflicts()
+    assert (conflict.kept_value, conflict.system_value, conflict.system_source) == ("True", "False", "security_alerts")
+    assert [e.action for e in store.events] == ["system", "answered", "conflict"]
+
+
+def test_confirming_a_system_judgment_call_is_no_conflict():
+    store = FactStore()
+    store.record_system("malicious_access", True, "security_alerts")
+    store.human_desk().answer("malicious_access", "yes", confirmed_by="Sam")
+    assert store.conflicts() == []
+
+
+def test_conflict_from_a_review_correction():
+    store = FactStore()
+    store.agent_view().suggest("costs_eur", 150_000, "ticket: about 150k")
+    store.human_desk().review([ReviewDecision(fact_name="costs_eur", action="correct", value=90_000)],
+                              confirmed_by="Sam")
+    store.record_system("affected_clients", 5, "client_data")  # unrelated: no conflict
+    assert store.conflicts() == []
+
+
+def test_conflict_disappears_when_the_human_corrects_their_answer():
+    store = FactStore()
+    store.human_desk().answer("critical_or_important", "no", confirmed_by="Sam")
+    store.record_system("critical_or_important", True, "service_list")
+    assert len(store.conflicts()) == 1
+    store.human_desk().answer("critical_or_important", "yes", confirmed_by="Sam")
+    assert store.conflicts() == []
+    assert store.snapshot().usable("critical_or_important") is True
+
+
+def test_conflict_shows_both_sides_in_plain_words():
+    store = FactStore()
+    store.human_desk().answer("costs_eur", 50_000, confirmed_by="Sam", is_estimate=True)
+    store.record_system("costs_eur", 250_000, "client_data")
+    text = store.conflicts()[0].describe()
+    assert text == ("costs_eur: using 50000 (confirmed by Sam, source human), but client_data says 250000. "
+                    "Please check and correct if needed.")
 
 
 def test_suggestion_never_overwrites_a_human_answer():

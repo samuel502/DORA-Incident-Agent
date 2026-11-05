@@ -35,7 +35,7 @@ _NAME = TypeAdapter(PersonName)
 
 Action = Literal[
     "system", "system_ignored", "suggested", "suggestion_ignored",
-    "answered", "answered_unsure", "confirmed", "corrected", "rejected",
+    "answered", "answered_unsure", "confirmed", "corrected", "rejected", "conflict",
 ]
 
 
@@ -53,6 +53,22 @@ class FactEvent(Frozen):
     source: str | None
     by: str | None  # who confirmed, for human actions
     note: str | None = None
+
+
+class Conflict(Frozen):
+    """A system says something different from what a human confirmed. The human answer is used;
+    both are shown so the human can correct their answer if the system is right (Sam, block 5 step 2)."""
+
+    fact_name: str
+    kept_value: str  # the human-confirmed value the engine uses
+    kept_source: str  # "human" or "ticket"
+    kept_by: str  # who confirmed it
+    system_value: str
+    system_source: str
+
+    def describe(self) -> str:
+        return (f"{self.fact_name}: using {self.kept_value} (confirmed by {self.kept_by}, source {self.kept_source}), "
+                f"but {self.system_source} says {self.system_value}. Please check and correct if needed.")
 
 
 class ReviewItem(Frozen):
@@ -101,8 +117,29 @@ class FactStore:
         self._facts: dict[str, Fact] = {}
         self._service_id: str | None = None
         self._events: list[FactEvent] = []
+        # The latest value each system reported, even when a human answer is kept instead (for conflicts).
+        self._system_values: dict[str, tuple[Any, str]] = {}
 
     # ---------- reading ----------
+
+    def conflicts(self) -> list[Conflict]:
+        """Every fact where a human-confirmed value differs from what a system reported.
+
+        Worked out fresh each time, so a conflict disappears once the human corrects their answer.
+        """
+        found = []
+        for name, (system_value, system_source) in self._system_values.items():
+            fact = self._facts.get(name)
+            if fact is not None and fact.confirmed_by is not None and fact.value != system_value:
+                found.append(Conflict(fact_name=name, kept_value=_short(fact.value), kept_source=fact.source,
+                                      kept_by=fact.confirmed_by, system_value=_short(system_value),
+                                      system_source=system_source))
+        return found
+
+    def has_value(self, name: str) -> bool:
+        """True if the fact holds a value from a system or a human (suggestions do not count)."""
+        fact = self._facts.get(name)
+        return fact is not None and fact.source != "ai_suggestion"
 
     def snapshot(self) -> IncidentFacts:
         """The facts as the rules engine sees them. Checked again in full on every snapshot."""
@@ -140,9 +177,14 @@ class FactStore:
         if value is None:
             return  # the system does not know: the fact stays unknown
         value = parse_value(name, value)
+        self._system_values[name] = (value, source)
         current = self._facts.get(name)
         if current is not None and current.confirmed_by is not None:
-            self._event(name, "system_ignored", value, source, None, "a human answer is kept")
+            # A human answer is never overwritten. If the system disagrees, flag it (Sam, block 5 step 2).
+            if current.value != value:
+                self._flag_conflict(name)
+            else:
+                self._event(name, "system_ignored", value, source, None, "same as the human answer")
             return
         self._facts[name] = _make(name, value=value, source=source, is_estimate=is_estimate,
                                   note=_clean(note, 500) if note else None)
@@ -174,7 +216,9 @@ class FactStore:
             return self._event(name, "answered_unsure", None, "human", confirmed_by)
         self._facts[name] = _make(name, value=value, source="human", confirmed_by=confirmed_by,
                                   is_estimate=is_estimate)
-        return self._event(name, "answered", value, "human", confirmed_by)
+        event = self._event(name, "answered", value, "human", confirmed_by)
+        self._flag_conflict(name)
+        return event
 
     def _apply_review(self, decisions: list[ReviewDecision], confirmed_by: str) -> list[FactEvent]:
         confirmed_by = _check_name(confirmed_by)
@@ -211,6 +255,7 @@ class FactStore:
                                           is_estimate=decision.is_estimate)
                 events.append(self._event(name, "corrected", corrected, "human", confirmed_by,
                                           f"suggested was {_short(item.suggested_value)}"))
+                self._flag_conflict(name)
             else:
                 del self._facts[name]
                 events.append(self._event(name, "rejected", None, None, confirmed_by,
@@ -218,6 +263,13 @@ class FactStore:
         return events
 
     # ---------- helpers ----------
+
+    def _flag_conflict(self, name: str) -> None:
+        """Record a 'conflict' event in the trace if a system disagrees with the human answer now held."""
+        conflict = next((c for c in self.conflicts() if c.fact_name == name), None)
+        if conflict is not None:
+            self._event(name, "conflict", conflict.kept_value, conflict.kept_source, conflict.kept_by,
+                        conflict.describe())
 
     def _event(self, name, action, value, source, by, note=None) -> FactEvent:
         event = FactEvent(seq=len(self._events) + 1, fact_name=name, action=action, value=_short(value),
