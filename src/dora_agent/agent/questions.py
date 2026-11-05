@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from dora_agent.agent.values import ValueProblem, kind_of, parse_value
+from dora_agent.agent.values import ValueProblem, parse_value
 from dora_agent.rules.facts import HUMAN_CONFIRMED
 
 YesNoUnsure = Literal["yes", "no", "unsure"]
@@ -140,7 +140,3 @@ def interpret_answer(fact_name: str, answer: Any) -> Any:
 def missing_judgment_questions() -> set[str]:
     """Section 7 judgment calls that have no fixed question (should always be empty; a test checks)."""
     return set(HUMAN_CONFIRMED) - set(QUESTIONS)
-
-
-def is_yes_no(fact_name: str) -> bool:
-    return kind_of(fact_name) == "yes_no"
