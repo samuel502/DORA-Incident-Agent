@@ -5,6 +5,7 @@ description = "DORA incident classification agent for a simulated bank (Rheinban
 requires-python = ">=3.11"
 dependencies = [
     "pydantic==2.14.1",
+    "groq==1.7.0",
 ]
 
 [tool.pytest.ini_options]

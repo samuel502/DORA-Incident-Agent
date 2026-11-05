@@ -1,6 +1,6 @@
 # Settings for the Rheinbank DORA agent.
 # No secrets here. API keys come only from environment variables (CLAUDE.md hard rule 5).
-# Agent loop limits (max steps, max tool calls) are added in block 5.
+# Agent loop limits (max steps, max tool calls) are added later in block 5.
 
 [connectors]
 # Longest search text the agent may send to find_service.
@@ -19,3 +19,18 @@ max_impact_window_days = 366
 max_alert_window_days = 31
 # get_supplier_notices searches a window of at most this many days.
 max_notice_window_days = 366
+
+[llm]
+# All LLM calls go through one provider interface (CLAUDE.md hard rule 7). Change the provider here.
+provider = "groq"
+model = "openai/gpt-oss-120b"
+# The API key is NOT here. It comes only from this environment variable (hard rule 5).
+api_key_env = "GROQ_API_KEY"
+# Seconds before one LLM call is given up (security framework: timeouts on LLM calls).
+timeout_seconds = 30
+# How many times the client may retry a failed call before giving up.
+max_retries = 1
+# Most tokens the LLM may write in one answer.
+max_output_tokens = 2000
+# 0 = as repeatable as possible.
+temperature = 0

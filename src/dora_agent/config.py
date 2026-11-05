@@ -41,3 +41,41 @@ def connector_limits() -> ConnectorLimits:
             raise ValueError(f"config.toml [connectors] {field.name} must be a positive integer")
         values[field.name] = value
     return ConnectorLimits(**values)
+
+
+@dataclass(frozen=True)
+class LlmSettings:
+    """The [llm] section. Names where the key lives, never the key itself (hard rule 5)."""
+
+    provider: str
+    model: str
+    api_key_env: str
+    timeout_seconds: int
+    max_retries: int
+    max_output_tokens: int
+    temperature: float
+
+
+@lru_cache(maxsize=1)
+def llm_settings() -> LlmSettings:
+    """Read the [llm] section once and check every value."""
+    with CONFIG_PATH.open("rb") as handle:
+        section = tomllib.load(handle)["llm"]
+    for name in ("provider", "model", "api_key_env"):
+        if not isinstance(section[name], str) or not section[name].strip():
+            raise ValueError(f"config.toml [llm] {name} must be a non-empty text")
+    for name in ("timeout_seconds", "max_output_tokens"):
+        value = section[name]
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise ValueError(f"config.toml [llm] {name} must be a positive integer")
+    retries = section["max_retries"]
+    if not isinstance(retries, int) or isinstance(retries, bool) or not 0 <= retries <= 5:
+        raise ValueError("config.toml [llm] max_retries must be a whole number from 0 to 5")
+    temperature = section["temperature"]
+    if not isinstance(temperature, (int, float)) or isinstance(temperature, bool) or not 0 <= temperature <= 2:
+        raise ValueError("config.toml [llm] temperature must be between 0 and 2")
+    return LlmSettings(
+        provider=section["provider"], model=section["model"], api_key_env=section["api_key_env"],
+        timeout_seconds=section["timeout_seconds"], max_retries=retries,
+        max_output_tokens=section["max_output_tokens"], temperature=float(temperature),
+    )

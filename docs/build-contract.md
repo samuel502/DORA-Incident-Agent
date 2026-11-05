@@ -44,6 +44,7 @@ Each block is built, explained, tested by Sam and approved before the next one s
 3. Simulated bank data and connectors.
 4. Rules engine plus its tests.
 5. Agent loop with tools, limits and logging.
+5b. Draft initial notification (major incidents only, for human approval), with the initial notification deadline and a warning that the weekend and bank holiday rules are not handled. Added 5 November 2026, approved by Sam.
 6. Gradio interface with trace view.
 7. Security tests and automated checks.
 8. Full test run, results recorded.
