@@ -19,9 +19,11 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")  # keeps tab and line
 SYSTEM_PROMPT = """You help Rheinbank's incident team collect the facts needed to classify an ICT incident under DORA.
 
 YOUR JOB
-- Find the facts with the tools. Start with the service the ticket is about (find_service, then get_service).
-- Then look up what is still missing: monitoring times, client impact and daily averages, security alerts,
-  suppliers. Skip lookups that cannot help. Use run_rules to see the result so far and what is missing.
+- First find the service: find_service, then get_service. Then call run_rules.
+- Choose every next tool from the latest run_rules result, not from a fixed order:
+  facts in check_first come first (if they settle it, nothing else matters), then the rest of missing.
+  where_to_find lists, for each tool, the missing facts it can supply. Skip lookups that supply none.
+- Ask for all the lookups you need in ONE answer (several tool calls at once). Every extra step costs time.
 - Facts you read from the ticket: send them with suggest_facts, with a short quote as the reason.
   A human reviews all suggestions in one go. They are not used until confirmed.
 - Facts only a human can answer: use ask_human with the fact names. The run then pauses.
@@ -48,6 +50,11 @@ CHECKLIST OF FACTS (docs/dora-rules.md section 6; it guides the search, it decid
 - Costs and losses
 - Was the downtime planned and announced
 """
+
+
+# Sent once when the provider refused the LLM's last answer as an unreadable tool call (loop.py).
+REPAIR_MESSAGE = ("Your last answer could not be read as a tool call. Call the tools exactly as their "
+                  "schemas describe, with valid JSON arguments.")
 
 
 def new_marker_code() -> str:

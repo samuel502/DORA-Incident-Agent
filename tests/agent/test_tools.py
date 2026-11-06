@@ -317,3 +317,65 @@ def test_tool_results_go_back_as_plain_json():
     box, _ = box_at()
     outcome = run(box, "get_service", service_id="SVC-OLB")
     json.dumps(outcome.content)  # serialisable, no objects leak to the LLM
+
+
+# ---------- block 5 step 5: run_rules says what to look for next; slimmer tool specs ----------
+
+from dora_agent.agent.prompts import SYSTEM_PROMPT  # noqa: E402
+from dora_agent.agent.questions import QUESTIONS  # noqa: E402
+from dora_agent.agent.tools import WHERE_TO_FIND  # noqa: E402
+from dora_agent.rules.facts import IncidentFacts  # noqa: E402
+
+HR_REPORTED = datetime(2026, 3, 10, 6, 40, tzinfo=UTC)
+
+
+def test_where_to_find_covers_every_fact_and_names_real_tools_only():
+    box, _ = box_at()
+    tools = {spec.name for spec in box.specs()}
+    assert set(WHERE_TO_FIND) == set(IncidentFacts.model_fields) - {"service_id"}
+    for fact, names in WHERE_TO_FIND.items():
+        assert names and set(names) <= tools, fact
+        assert "ask_human" not in names or fact in QUESTIONS, fact  # ask_human only where a fixed question exists
+
+
+def test_n01_run_rules_points_at_the_security_alerts_first():
+    box, _ = box_at(HR_REPORTED)
+    run(box, "get_service", service_id="SVC-HR")
+    content = run(box, "run_rules").content
+    # Not critical, not regulated: only G-c (RTS-C Art. 6(c)) can still open the gate, so its facts come first.
+    assert content["check_first"] == ["malicious_access", "access_on_own_systems"]
+    assert content["where_to_find"]["get_security_alerts"][:2] == ["malicious_access", "access_on_own_systems"]
+    assert set(content["check_first"]) <= set(content["missing"])
+
+
+def test_no_check_first_once_the_gate_is_passed():
+    box, _ = box_at()
+    run(box, "get_service", service_id="SVC-OLB")  # critical: gate passed (G-a)
+    content = run(box, "run_rules").content
+    assert content["check_first"] == []
+    assert "get_client_impact" in content["where_to_find"]
+
+
+def test_where_to_find_lists_only_missing_facts():
+    box, _ = box_at()
+    run(box, "get_service", service_id="SVC-OLB")
+    content = run(box, "run_rules").content
+    listed = {fact for facts in content["where_to_find"].values() for fact in facts}
+    assert listed == set(content["missing"])
+
+
+def test_tool_specs_sent_to_the_llm_are_slim_but_limits_still_apply():
+    box, _ = box_at()
+    for spec in box.specs():
+        keys = set(_all_keys(spec.parameters))
+        assert not keys & {"title", "minLength", "maxLength", "minItems", "maxItems"}, spec.name
+    # The limits are still checked in code, against the full argument models.
+    assert run(box, "find_service", text="x" * 101).error.startswith("invalid arguments")
+    assert run(box, "ask_human", facts=["media_coverage"] * 21).error.startswith("invalid arguments")
+    assert run(box, "get_service", service_id="online banking").error.startswith("invalid arguments")
+
+
+def test_instructions_ask_for_batched_lookups_and_keep_the_checklist():
+    assert "ONE answer" in SYSTEM_PROMPT
+    assert "check_first" in SYSTEM_PROMPT and "where_to_find" in SYSTEM_PROMPT
+    assert "CHECKLIST OF FACTS" in SYSTEM_PROMPT  # project brief: the checklist stays in the instructions

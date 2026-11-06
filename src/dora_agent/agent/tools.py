@@ -32,11 +32,12 @@ from dora_agent.config import agent_limits
 from dora_agent.connectors import InvalidQuery
 from dora_agent.llm.provider import ToolCall, ToolSpec
 from dora_agent.rules import Classification, classify
+from dora_agent.rules.thresholds import UNKNOWN
 
 
 ServiceId = Field(pattern=r"^SVC-[A-Z]{2,8}$")
 SupplierId = Field(pattern=r"^SUP-[A-Z]{2,8}$")
-TimeText = Field(min_length=1, max_length=40, description="ISO 8601 time with zone, e.g. 2026-05-26T07:10:00Z")
+TimeText = Field(min_length=1, max_length=40, description="ISO 8601 with zone")
 RecordId = Field(pattern=r"^(PRB|IMP|ALR)-\d{4}$")
 
 
@@ -51,7 +52,7 @@ class NoArgs(Args):
 
 
 class FindServiceArgs(Args):
-    text: str = Field(min_length=1, max_length=100, description="A few words naming the service, from the ticket")
+    text: str = Field(min_length=1, max_length=100, description="A few words from the ticket")
 
 
 class ServiceArgs(Args):
@@ -61,7 +62,7 @@ class ServiceArgs(Args):
 class TimelineArgs(Args):
     service_id: str = ServiceId
     around: str | None = Field(default=None, min_length=1, max_length=40,
-                               description="Time to search around (ISO 8601 with zone). Default: the reported time")
+                               description="ISO 8601 with zone. Default: reported time")
     window_hours: int = Field(default=24, ge=1, le=72)
 
 
@@ -93,8 +94,8 @@ class UseRecordArgs(Args):
 
 class Suggestion(Args):
     fact: str = Field(min_length=1, max_length=60)
-    value: bool | int | str | list[str] = Field(description="true/false, a whole number, an ISO time, or country codes")
-    reason: str = Field(min_length=1, max_length=300, description="Short quote or reason from the ticket")
+    value: bool | int | str | list[str] = Field(description="true/false, number, ISO time, or country codes")
+    reason: str = Field(min_length=1, max_length=300, description="Short quote from the ticket")
 
 
 class SuggestArgs(Args):
@@ -102,7 +103,7 @@ class SuggestArgs(Args):
 
 
 class AskArgs(Args):
-    facts: list[str] = Field(min_length=1, max_length=20, description="Fact names whose fixed question to ask")
+    facts: list[str] = Field(min_length=1, max_length=20, description="Fact names")
 
 
 class ToolOutcome(BaseModel):
@@ -318,6 +319,73 @@ def _ask_human(box: Toolbox, args: AskArgs) -> ToolOutcome:
                              "note": "the run pauses here; the human answers these and reviews all suggestions"})
 
 
+# Where the agent can find each fact: docs/dora-rules.md section 6, "Where Rheinbank keeps it".
+# It guides the search only and decides nothing (hard rule 1). "ask_human" means a human answers or
+# confirms (section 7); "suggest_facts" means the ticket may say it. A test checks every fact is covered.
+_ALERTS_THEN_HUMAN = ("get_security_alerts", "ask_human")
+WHERE_TO_FIND: dict[str, tuple[str, ...]] = {
+    "planned_and_announced": ("get_outage_timeline", "ask_human"),  # open question 5
+    "planned_window_end": ("get_outage_timeline",),  # open question 8
+    "critical_or_important": ("get_service", "ask_human"),  # service list
+    "regulated_service": ("get_service", "ask_human"),  # service list
+    "malicious_access": _ALERTS_THEN_HUMAN,  # security alerts, human confirms
+    "access_on_own_systems": _ALERTS_THEN_HUMAN,  # open question 4
+    "access_may_cause_data_loss": ("ask_human",),  # T5-b
+    "affected_clients": ("get_client_impact", "ask_human"),  # client data
+    "total_clients": ("get_daily_averages",),
+    "affected_counterparts": ("get_client_impact", "ask_human"),
+    "total_counterparts": ("get_daily_averages",),
+    "affected_tx_count": ("get_client_impact",),
+    "daily_avg_tx_count": ("get_daily_averages",),
+    "affected_tx_value_eur": ("get_client_impact",),
+    "daily_avg_tx_value_eur": ("get_daily_averages",),
+    "relevant_parties_affected": ("get_client_impact", "ask_human"),  # client data, human confirms
+    "media_coverage": ("ask_human",),  # T2: human
+    "repeated_complaints": ("ask_human",),
+    "regulatory_requirements_impact": ("ask_human",),
+    "client_loss_impact": ("ask_human",),
+    "incident_start": ("get_outage_timeline", "suggest_facts"),  # monitoring, ticket
+    "detected_at": ("get_outage_timeline", "suggest_facts"),
+    "earliest_log_at": ("get_security_alerts",),  # RTS-C Art. 3(1)
+    "resolved_at": ("get_outage_timeline", "ask_human"),
+    "downtime_start": ("get_outage_timeline",),  # monitoring
+    "service_restored_at": ("get_outage_timeline",),
+    "backlog_cleared_at": ("get_outage_timeline",),
+    "affected_member_states": ("get_client_impact", "get_suppliers_for_service"),  # client data, supplier register
+    "data_availability_impact": _ALERTS_THEN_HUMAN,  # T5-a: security alerts, human confirms
+    "data_authenticity_impact": _ALERTS_THEN_HUMAN,
+    "data_integrity_impact": _ALERTS_THEN_HUMAN,
+    "data_confidentiality_impact": _ALERTS_THEN_HUMAN,
+    "data_impact_adverse": ("ask_human",),  # T5-a: human
+    "costs_eur": ("ask_human",),  # T6: human
+}
+
+# Step 0 (is it an incident at all?) comes before the gate: open questions 5 and 8, DORA Art. 3(8).
+_INCIDENT_FACTS = ("planned_and_announced", "planned_window_end")
+
+
+def check_first(result: Classification) -> list[str]:
+    """Missing facts that can settle the case on their own, in the order the engine uses them.
+
+    Step 0 facts first (an event that is not an incident is never classified), then the gate facts,
+    because major = gate AND thresholds (RTS-C Art. 8(1)): if the gate fails, no threshold matters.
+    Read from the engine's own result; no rule is repeated here.
+    """
+    first = [name for name in result.missing if name in _INCIDENT_FACTS]
+    if result.gate is not None and result.gate.status == UNKNOWN:
+        first += [name for name in result.gate.missing if name not in first]
+    return first
+
+
+def where_to_find(missing: tuple[str, ...]) -> dict[str, list[str]]:
+    """For each tool, the missing facts it can supply (grouped by tool: shorter, and easy to act on)."""
+    grouped: dict[str, list[str]] = {}
+    for name in missing:
+        for tool in WHERE_TO_FIND.get(name, ("suggest_facts",)):
+            grouped.setdefault(tool, []).append(name)
+    return grouped
+
+
 def _run_rules(box: Toolbox, args: NoArgs) -> ToolOutcome:
     result = classify(box._store.snapshot(), box.context.as_of)
     box.context.last_classification = result
@@ -325,23 +393,37 @@ def _run_rules(box: Toolbox, args: NoArgs) -> ToolOutcome:
         "result": result.result,
         "summary": result.summary,
         "thresholds_met": list(result.thresholds_met),
+        "check_first": check_first(result),
         "missing": list(result.missing),
+        "where_to_find": where_to_find(result.missing),
         "waiting_for_human": list(result.pending_confirmations),
         "conflicts": [c.describe() for c in box._store.conflicts()],
     })
 
 
 def _spec(name: str, description: str, args: type[Args]) -> ToolSpec:
-    schema = args.model_json_schema()
-    schema.pop("title", None)
-    return ToolSpec(name=name, description=description, parameters=schema)
+    # The schema is sent with every LLM call, so it is slimmed (shorter prompts, block 5 step 5):
+    # pydantic's "title" labels and the length/count limits are left out of the copy the LLM sees.
+    # The limits are NOT dropped: Toolbox.run checks every call against the full model (`args`) above.
+    return ToolSpec(name=name, description=description, parameters=_slim(args.model_json_schema()))
+
+
+_NOT_SENT = frozenset({"title", "minLength", "maxLength", "minItems", "maxItems"})
+
+
+def _slim(node):
+    if isinstance(node, dict):
+        return {k: _slim(v) for k, v in node.items() if not (k in _NOT_SENT and not isinstance(v, dict))}
+    if isinstance(node, list):
+        return [_slim(v) for v in node]
+    return node
 
 
 _TOOLS = [
     _Tool(_spec("find_service", "Find the bank service a ticket is about, from a few words.", FindServiceArgs),
           FindServiceArgs, _find_service),
-    _Tool(_spec("get_service", "Look up one service: is it critical or important, is it regulated. "
-                "The first service found becomes the incident service.", ServiceArgs), ServiceArgs, _get_service),
+    _Tool(_spec("get_service", "One service: critical or important? regulated? The first one looked up becomes "
+                "the incident service.", ServiceArgs), ServiceArgs, _get_service),
     _Tool(_spec("get_outage_timeline", "Monitoring: when the service went down and came back.", TimelineArgs),
           TimelineArgs, _get_outage_timeline),
     _Tool(_spec("get_client_impact", "Client data: affected clients, counterparts, transactions, countries.",
@@ -357,10 +439,11 @@ _TOOLS = [
           NoticeArgs, _get_supplier_notices),
     _Tool(_spec("use_record", "When a lookup returned several records, pick the one about this incident.",
                 UseRecordArgs), UseRecordArgs, _use_record),
-    _Tool(_spec("suggest_facts", "Suggest facts read from the ticket. A human reviews all of them in one go; "
-                "they are not used until confirmed.", SuggestArgs), SuggestArgs, _suggest_facts),
+    _Tool(_spec("suggest_facts", "Suggest facts read from the ticket. Not used until a human confirms them.",
+                SuggestArgs), SuggestArgs, _suggest_facts),
     _Tool(_spec("ask_human", "Queue fixed questions for facts only a human can answer.", AskArgs),
           AskArgs, _ask_human),
-    _Tool(_spec("run_rules", "Run the DORA rules engine on the facts so far. Returns the result and what is "
-                "still missing.", NoArgs), NoArgs, _run_rules),
+    _Tool(_spec("run_rules", "Run the DORA rules engine on the facts so far. Returns the result, check_first, "
+                "missing, and where_to_find: for each tool, the missing facts it can supply.", NoArgs),
+          NoArgs, _run_rules),
 ]

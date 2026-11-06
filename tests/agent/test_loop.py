@@ -334,3 +334,57 @@ def test_human_input_is_logged_with_who_gave_it():
     assert human["by"] == "Sam" and human["answers"] == {"malicious_access": "no"}
     gate = [r for r in result.trace if r["kind"] == "gate_check"]
     assert len(gate) == 2
+
+
+# ---------- an unreadable tool call refused by the provider (block 5 step 5) ----------
+
+
+class RefusesThen:
+    """Raises 'tool_use_failed' for the first n calls, then plays the script."""
+
+    name = "fake"
+
+    def __init__(self, n, script):
+        self._n, self._fake = n, FakeProvider(script)
+        self.seen = []
+
+    def chat(self, messages, tools):
+        self.seen.append(list(messages))
+        if self._n:
+            self._n -= 1
+            raise LlmError("LLM call refused: BadRequestError (HTTP 400, tool_use_failed)", code="tool_use_failed")
+        return self._fake.chat(messages, tools)
+
+
+def test_one_refused_tool_call_gets_one_retry_and_counts_as_a_step():
+    provider = RefusesThen(1, b01_script())
+    result = AgentRun("Online banking down since 9:10, customers can't log in.", t("2026-05-26T07:15:00Z"),
+                      provider).start()
+    assert result.classification.result == "major"
+    assert result.steps_used == 5  # 4 answers + the refused call
+    assert "could not be read as a tool call" in provider.seen[1][-1].content
+    [error] = [r for r in result.trace if r["kind"] == "llm_error"]
+    assert error["code"] == "tool_use_failed"
+
+
+def test_two_refused_tool_calls_in_a_row_stop_the_run():
+    result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), RefusesThen(2, [])).start()
+    assert (result.status, result.stop_reason) == ("stopped", "llm_error")
+
+
+def test_refused_tool_calls_still_hit_the_step_limit():
+    provider = RefusesThen(1, [call("find_service", text="online banking")] * 10)
+    result = AgentRun("x", t("2026-05-26T07:15:00Z"), provider, limits=small(max_steps=2)).start()
+    assert (result.stop_reason, result.steps_used) == ("step_limit", 2)
+
+
+def test_other_llm_errors_are_not_retried():
+    class RateLimited:
+        name = "fake"
+
+        def chat(self, messages, tools):
+            raise LlmError("LLM call refused: RateLimitError (HTTP 429, rate_limit_exceeded)",
+                           code="rate_limit_exceeded")
+
+    result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), RateLimited()).start()
+    assert (result.stop_reason, result.steps_used) == ("llm_error", 0)

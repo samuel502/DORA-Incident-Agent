@@ -175,3 +175,31 @@ def test_report_holds_no_api_key(tmp_path, monkeypatch):
         assert not found, path.name
     report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
     assert report["summary"]["matched"] == 1
+
+
+# ---------- a run only counts if the agent really worked (block 5 step 5) ----------
+
+
+def test_a_run_that_used_no_tools_never_counts_as_matched():
+    from dora_agent.llm.fake_provider import FakeProvider, say
+
+    scenario = next(s for s in SCENARIOS if s.scenario_id == "B03")  # expected: undetermined
+    outcome = run_case(scenario, FakeProvider([say("done")] * 5))
+    assert outcome.result == "undetermined"  # the result happens to fit ...
+    assert not outcome.valid and not outcome.matched  # ... but nothing was looked up, so it does not count
+
+
+def test_a_run_that_ended_on_an_llm_error_never_counts_as_matched():
+    from dora_agent.llm.provider import LlmError
+
+    class RateLimited:
+        name = "fake"
+
+        def chat(self, messages, tools):
+            raise LlmError("LLM call refused: RateLimitError (HTTP 429, rate_limit_exceeded)",
+                           code="rate_limit_exceeded")
+
+    scenario = next(s for s in SCENARIOS if s.scenario_id == "B03")
+    outcome = run_case(scenario, RateLimited())
+    assert (outcome.stop_reason, outcome.valid, outcome.matched) == ("llm_error", False, False)
+    assert summary([outcome])["invalid"] == ["B03"]

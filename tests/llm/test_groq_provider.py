@@ -103,9 +103,13 @@ def test_empty_answer_raises_llm_error():
 # ---------- errors: short, safe, never the provider's raw text ----------
 
 
-def status_error(cls, code):
-    response = httpx.Response(code, request=REQUEST)
-    return cls(f"provider said something containing {FAKE_KEY}", response=response, body=None)
+def status_error(cls, code, body=None, headers=None):
+    response = httpx.Response(code, request=REQUEST, headers=headers or {})
+    return cls(f"provider said something containing {FAKE_KEY}", response=response, body=body)
+
+
+def no_sleep(seconds):
+    pass
 
 
 @pytest.mark.parametrize(
@@ -120,7 +124,7 @@ def status_error(cls, code):
 def test_provider_errors_become_short_llm_errors_without_raw_text(error, expected):
     client = StandInClient(error=error)
     with pytest.raises(LlmError) as caught:
-        GroqProvider(llm_settings(), client=client).chat([Message(role="user", content="x")], [])
+        GroqProvider(llm_settings(), client=client, sleep=no_sleep).chat([Message(role="user", content="x")], [])
     assert expected in str(caught.value)
     assert FAKE_KEY not in str(caught.value)
     assert caught.value.__cause__ is None  # raw provider error not chained into tracebacks
@@ -154,3 +158,89 @@ def test_real_client_gets_timeout_and_retries(monkeypatch):
     client = GroqProvider(llm_settings())._client
     assert client.timeout == llm_settings().timeout_seconds
     assert client.max_retries == llm_settings().max_retries
+
+
+# ---------- rate limits: wait and retry (block 5 step 5) ----------
+
+
+class Flaky(StandInClient):
+    """Raises the given errors first, then answers."""
+
+    def __init__(self, errors, final):
+        super().__init__(answer=final)
+        self._errors = list(errors)
+
+    def _create(self, **request):
+        self.requests.append(request)
+        if self._errors:
+            raise self._errors.pop(0)
+        return self._answer
+
+
+def test_rate_limit_waits_and_retries_then_succeeds():
+    slept = []
+    client = Flaky([status_error(groq.RateLimitError, 429), status_error(groq.RateLimitError, 429)], answer("ok"))
+    result = GroqProvider(llm_settings(), client=client, sleep=slept.append).chat(
+        [Message(role="user", content="x")], [])
+    assert result.text == "ok" and len(client.requests) == 3
+    assert slept == [2.0, 4.0]  # no retry-after header: 2, 4, 8 ... seconds
+
+
+def test_rate_limit_uses_the_providers_suggested_wait():
+    slept = []
+    client = Flaky([status_error(groq.RateLimitError, 429, headers={"retry-after": "7.5"})], answer("ok"))
+    GroqProvider(llm_settings(), client=client, sleep=slept.append).chat([Message(role="user", content="x")], [])
+    assert slept == [7.5]
+
+
+def test_rate_limit_gives_up_after_the_configured_retries():
+    slept = []
+    client = StandInClient(error=status_error(groq.RateLimitError, 429,
+                                              body={"error": {"code": "rate_limit_exceeded", "message": FAKE_KEY}}))
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client, sleep=slept.append).chat([Message(role="user", content="x")], [])
+    settings = llm_settings()
+    assert len(slept) == settings.rate_limit_retries and sum(slept) <= settings.rate_limit_max_wait_seconds
+    assert caught.value.code == "rate_limit_exceeded"
+    assert "HTTP 429" in str(caught.value) and FAKE_KEY not in str(caught.value)
+
+
+def test_rate_limit_never_waits_past_the_total_cap():
+    slept = []
+    client = StandInClient(error=status_error(groq.RateLimitError, 429, headers={"retry-after": "500"}))
+    with pytest.raises(LlmError):
+        GroqProvider(llm_settings(), client=client, sleep=slept.append).chat([Message(role="user", content="x")], [])
+    assert slept == []  # 500 s is over the cap, so it gives up at once
+
+
+@pytest.mark.parametrize("body, code", [
+    ({"error": {"code": "tool_use_failed", "message": f"bad call {FAKE_KEY}"}}, "tool_use_failed"),
+    ({"code": "tool_use_failed"}, "tool_use_failed"),
+    ({"error": {"code": f"weird-{FAKE_KEY}"}}, "other"),  # not on the list: never shown as is
+    ({"error": {"message": "no code"}}, None),
+    (None, None),
+])
+def test_error_code_comes_only_from_the_fixed_list(body, code):
+    client = StandInClient(error=status_error(groq.BadRequestError, 400, body=body))
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client).chat([Message(role="user", content="x")], [])
+    assert caught.value.code == code
+    assert "HTTP 400" in str(caught.value) and FAKE_KEY not in str(caught.value)
+
+
+def test_calls_are_paced_to_the_tokens_per_minute_limit():
+    clock = {"now": 0.0}
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock["now"] += seconds
+
+    client = StandInClient(answer("ok", prompt_tokens=5000, completion_tokens=500))
+    provider = GroqProvider(llm_settings(), client=client, sleep=sleep, clock=lambda: clock["now"])
+    provider.chat([Message(role="user", content="x")], [])
+    assert slept == []  # first call: nothing used yet
+    provider.chat([Message(role="user", content="x")], [])  # 5,500 used + ~500 expected: fits in 8,000
+    assert slept == []
+    provider.chat([Message(role="user", content="x")], [])  # 11,000 used: must wait for the minute to pass
+    assert len(slept) == 1 and 59 < slept[0] <= 60.2

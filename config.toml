@@ -33,6 +33,13 @@ max_retries = 1
 max_output_tokens = 2000
 # 0 = as repeatable as possible.
 temperature = 0
+# Rate limits (HTTP 429): how many times one call waits and tries again. The wait is the one the
+# provider suggests, if it sends one, else 2, 4, 8, 16 ... seconds.
+rate_limit_retries = 4
+# Most seconds one LLM call may spend waiting on rate limits, in total. Keeps every run bounded (hard rule 8).
+rate_limit_max_wait_seconds = 90
+# Pace calls to stay under this many tokens per minute (Groq free tier: 8000). 0 = no pacing.
+tokens_per_minute = 8000
 
 [agent]
 # Hard limits on the agent loop (CLAUDE.md hard rule 8). When one is reached, the run stops,

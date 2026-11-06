@@ -6,6 +6,8 @@ How one case runs:
    (the answer key, copied from the block 4 hand-checked facts) and reviews every ticket suggestion.
 3. The final result is always the rules engine's (hard rule 1). It is compared with expected_result
    using the same mapping as the block 4 tests (tests/rules/test_case_library.py).
+4. A run only counts if it is valid: it did not end on an LLM error and it used at least one tool.
+   An invalid run never counts as matched, even if its result happens to fit (live run B03, 6 Nov 2026).
 
 The scripted human knows only what the answer key says:
 - A yes/no question not in the key is answered "unsure", so the fact stays unknown (section 7: never guessed).
@@ -126,6 +128,11 @@ def matches(expected: str, classification: Classification) -> bool:
     raise ValueError(f"unknown expected result {expected!r}")
 
 
+def is_valid(result: RunResult) -> bool:
+    """A run counts only if the agent really worked: no LLM error, and at least one tool call."""
+    return result.stop_reason != "llm_error" and result.tool_calls_used > 0
+
+
 @dataclass(frozen=True)
 class CaseOutcome:
     """What one scenario did. Safe to write to a report: no secrets, no raw LLM text."""
@@ -133,7 +140,8 @@ class CaseOutcome:
     scenario_id: str
     expected: str
     result: str
-    matched: bool
+    matched: bool  # valid AND the result fits the expected result
+    valid: bool  # no LLM error, and at least one tool used
     status: str
     stop_reason: str
     tool_path: tuple[str, ...]
@@ -169,9 +177,11 @@ def run_case(scenario: Scenario, provider: LlmProvider, *, as_of: datetime = AS_
 
     steps = [r for r in result.trace if r["kind"] == "llm_step"]
     c = result.classification
+    valid = is_valid(result)
     return CaseOutcome(
         scenario_id=scenario.scenario_id, expected=scenario.expected_result, result=c.result,
-        matched=matches(scenario.expected_result, c), status=result.status, stop_reason=result.stop_reason,
+        matched=valid and matches(scenario.expected_result, c), valid=valid,
+        status=result.status, stop_reason=result.stop_reason,
         tool_path=result.tool_path, questions_asked=tuple(asked), review=tuple(review_log),
         human_rounds=result.human_rounds, steps=result.steps_used, tool_calls=result.tool_calls_used,
         thresholds_met=c.thresholds_met, missing=c.missing, conflicts=len(result.conflicts),
@@ -196,6 +206,7 @@ def summary(outcomes: list[CaseOutcome]) -> dict[str, Any]:
     return {
         "cases": len(outcomes),
         "matched": sum(o.matched for o in outcomes),
+        "invalid": sorted(o.scenario_id for o in outcomes if not o.valid),
         "distinct_tool_paths": len({o.tool_path for o in outcomes}),
         "stopped_early": sorted(o.scenario_id for o in outcomes if o.status == "stopped"),
         "not_matched": sorted(o.scenario_id for o in outcomes if not o.matched),
@@ -218,5 +229,6 @@ def table(outcomes: list[CaseOutcome]) -> str:
     lines = [f"{'case':7} {'expected':17} {'result':16} ok  steps tools rounds  path"]
     for o in outcomes:
         lines.append(f"{o.scenario_id:7} {o.expected:17} {o.result:16} {'yes' if o.matched else 'NO ':3} "
-                     f"{o.steps:5} {o.tool_calls:5} {o.human_rounds:6}  {' > '.join(o.tool_path)}")
+                     f"{o.steps:5} {o.tool_calls:5} {o.human_rounds:6}  {' > '.join(o.tool_path)}"
+                     f"{'' if o.valid else '  [INVALID: ' + o.stop_reason + ']'}")
     return "\n".join(lines)

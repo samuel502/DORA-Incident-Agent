@@ -28,7 +28,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from dora_agent.agent.fact_store import Conflict, FactStore, ReviewDecision, ReviewItem, StoreProblem
-from dora_agent.agent.prompts import new_marker_code, system_prompt, task_message, tool_message
+from dora_agent.agent.prompts import (REPAIR_MESSAGE, new_marker_code, system_prompt, task_message,
+                                      tool_message)
 from dora_agent.agent.questions import AnswerProblem, QUESTIONS, interpret_answer
 from dora_agent.agent.tools import RunContext, Toolbox
 from dora_agent.audit import DecisionLog
@@ -103,6 +104,7 @@ class AgentRun:
         ]
         self._log = DecisionLog(self.run_id, log_dir / f"{self.run_id}.jsonl" if log_dir else None)
         self._steps = self._tool_calls = self._human_rounds = 0
+        self._repairing = False  # True right after a refused, unreadable tool call (one retry only)
         self._tool_path: list[str] = []
         self._logged_events = 0
         self._state: Status | None = None
@@ -177,8 +179,16 @@ class AgentRun:
             try:
                 response = self._provider.chat(self._messages, self._toolbox.specs())
             except LlmError as error:
-                self._log.write("llm_error", error=str(error))
+                self._log.write("llm_error", error=str(error), code=error.code)
+                if error.code == "tool_use_failed" and not self._repairing:
+                    # The provider refused an unreadable tool call. Say so once and let the LLM try again.
+                    # The failed call counts as a step, so the step limit still applies (hard rule 8).
+                    self._steps += 1
+                    self._repairing = True
+                    self._messages.append(Message(role="user", content=REPAIR_MESSAGE))
+                    continue
                 return self._end("stopped", "llm_error", str(error))
+            self._repairing = False
             self._steps += 1
             self._log.write("llm_step", step=self._steps, text=response.text[:1000],
                             proposed=[{"tool": c.name[:60], "arguments": c.raw_arguments[:500] or c.arguments}

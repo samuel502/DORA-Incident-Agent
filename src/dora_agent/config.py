@@ -54,6 +54,9 @@ class LlmSettings:
     max_retries: int
     max_output_tokens: int
     temperature: float
+    rate_limit_retries: int  # waits and retries on HTTP 429
+    rate_limit_max_wait_seconds: int  # most seconds one call may wait on rate limits, in total
+    tokens_per_minute: int  # pace calls to stay under this; 0 = no pacing
 
 
 @lru_cache(maxsize=1)
@@ -74,10 +77,17 @@ def llm_settings() -> LlmSettings:
     temperature = section["temperature"]
     if not isinstance(temperature, (int, float)) or isinstance(temperature, bool) or not 0 <= temperature <= 2:
         raise ValueError("config.toml [llm] temperature must be between 0 and 2")
+    limits = {}
+    for name, low, high in (("rate_limit_retries", 0, 10), ("rate_limit_max_wait_seconds", 1, 600),
+                            ("tokens_per_minute", 0, 10_000_000)):
+        value = section[name]
+        if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+            raise ValueError(f"config.toml [llm] {name} must be a whole number from {low} to {high}")
+        limits[name] = value
     return LlmSettings(
         provider=section["provider"], model=section["model"], api_key_env=section["api_key_env"],
         timeout_seconds=section["timeout_seconds"], max_retries=retries,
-        max_output_tokens=section["max_output_tokens"], temperature=float(temperature),
+        max_output_tokens=section["max_output_tokens"], temperature=float(temperature), **limits,
     )
 
 

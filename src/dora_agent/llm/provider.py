@@ -26,7 +26,13 @@ class LlmError(Exception):
     """Any failure talking to the LLM: missing key, timeout, network, refused request.
 
     The message is always short and plain. It never contains the API key or the provider's raw error text.
+    `code` is a short error code from a fixed list (e.g. "rate_limit_exceeded", "tool_use_failed"),
+    "other" for anything not on the list, or None if the provider sent none.
     """
+
+    def __init__(self, message: str, code: str | None = None):
+        super().__init__(message)
+        self.code = code
 
 
 class ToolSpec(Frozen):

@@ -5,7 +5,7 @@ Skipped unless BOTH are set:
     RUN_LIVE_TESTS=1  explicit opt-in, so a plain `pytest` never spends tokens by accident
 Optional:
     LIVE_CASES=C01,N01,B03   run only these scenarios (default: all 27)
-    LIVE_PAUSE_SECONDS=5     pause between cases, to stay under Groq rate limits
+    LIVE_PAUSE_SECONDS=60    pause between cases, to stay under Groq rate limits (default 60)
 
 What these tests check: the runs complete, the result always comes from the rules engine,
 the key never reaches a log or the report, and the real model takes different tool paths.
@@ -51,7 +51,7 @@ def _selected():
 def live_run():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_dir = OUT_DIR / stamp
-    pause = float(os.environ.get("LIVE_PAUSE_SECONDS", "5"))
+    pause = float(os.environ.get("LIVE_PAUSE_SECONDS", "60"))
     provider = get_provider()  # one Groq client for all cases
     outcomes = run_cases(_selected(), lambda scenario: provider, log_dir=run_dir / "decision_logs",
                          between=lambda: time.sleep(pause))
@@ -67,6 +67,13 @@ def test_every_case_ran_to_an_end_without_llm_errors(live_run):
     for o in outcomes:
         assert o.status in ("finished", "stopped"), o.scenario_id
         assert o.stop_reason != "llm_error", f"{o.scenario_id}: the LLM call failed (rate limit or network?)"
+
+
+def test_every_case_used_tools(live_run):
+    # A case that used no tools proves nothing, even if its result happens to fit (B03, 6 Nov 2026).
+    outcomes, _ = live_run
+    idle = [o.scenario_id for o in outcomes if o.tool_calls == 0]
+    assert not idle, f"no tools used in: {idle}"
 
 
 def test_every_run_is_fully_logged_with_the_engine_result(live_run):
