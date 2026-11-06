@@ -6,8 +6,11 @@ How one case runs:
    (the answer key, copied from the block 4 hand-checked facts) and reviews every ticket suggestion.
 3. The final result is always the rules engine's (hard rule 1). It is compared with expected_result
    using the same mapping as the block 4 tests (tests/rules/test_case_library.py).
-4. A run only counts if it is valid: it did not end on an LLM error and it used at least one tool.
-   An invalid run never counts as matched, even if its result happens to fit (live run B03, 6 Nov 2026).
+4. A run only counts if it is valid: it did not end on an LLM error, it used at least one tool, and it
+   found the scenario's own service (live run B03, 6 Nov 2026, picked the wrong one). An invalid run never
+   counts as matched, even if its result happens to fit.
+5. If a case ends because access was refused (HTTP 401 or 403), the remaining cases are not run:
+   they would all fail the same way. They are listed as "not_run".
 
 The scripted human knows only what the answer key says:
 - A yes/no question not in the key is answered "unsure", so the fact stays unknown (section 7: never guessed).
@@ -128,9 +131,25 @@ def matches(expected: str, classification: Classification) -> bool:
     raise ValueError(f"unknown expected result {expected!r}")
 
 
-def is_valid(result: RunResult) -> bool:
-    """A run counts only if the agent really worked: no LLM error, and at least one tool call."""
-    return result.stop_reason != "llm_error" and result.tool_calls_used > 0
+def is_valid(result: RunResult, scenario: Scenario) -> bool:
+    """A run counts only if the agent really worked: no LLM error, at least one tool call, right service."""
+    return (result.stop_reason != "llm_error" and result.tool_calls_used > 0
+            and result.classification.facts.service_id == scenario.service_id)
+
+
+def _access_refused(result: RunResult) -> bool:
+    return any(r["kind"] == "llm_error" and r.get("status") in (401, 403) for r in result.trace)
+
+
+def not_run(scenario: Scenario) -> CaseOutcome:
+    """A case skipped because access was refused on an earlier case."""
+    return CaseOutcome(
+        scenario_id=scenario.scenario_id, expected=scenario.expected_result, result="not_run", matched=False,
+        valid=False, status="not_run", stop_reason="not_run", tool_path=(), questions_asked=(), review=(),
+        human_rounds=0, steps=0, tool_calls=0, thresholds_met=(), missing=(), conflicts=0,
+        input_tokens=0, output_tokens=0, run_id="", service_found=None,
+        expected_service=scenario.service_id, access_refused=False,
+    )
 
 
 @dataclass(frozen=True)
@@ -141,7 +160,7 @@ class CaseOutcome:
     expected: str
     result: str
     matched: bool  # valid AND the result fits the expected result
-    valid: bool  # no LLM error, and at least one tool used
+    valid: bool  # no LLM error, at least one tool used, and the scenario's own service found
     status: str
     stop_reason: str
     tool_path: tuple[str, ...]
@@ -156,6 +175,9 @@ class CaseOutcome:
     input_tokens: int
     output_tokens: int
     run_id: str
+    service_found: str | None = None  # the incident service the agent settled on
+    expected_service: str = ""  # the scenario's own service
+    access_refused: bool = False  # ended on HTTP 401 or 403
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -177,7 +199,7 @@ def run_case(scenario: Scenario, provider: LlmProvider, *, as_of: datetime = AS_
 
     steps = [r for r in result.trace if r["kind"] == "llm_step"]
     c = result.classification
-    valid = is_valid(result)
+    valid = is_valid(result, scenario)
     return CaseOutcome(
         scenario_id=scenario.scenario_id, expected=scenario.expected_result, result=c.result,
         matched=valid and matches(scenario.expected_result, c), valid=valid,
@@ -187,15 +209,21 @@ def run_case(scenario: Scenario, provider: LlmProvider, *, as_of: datetime = AS_
         thresholds_met=c.thresholds_met, missing=c.missing, conflicts=len(result.conflicts),
         input_tokens=sum(r.get("input_tokens") or 0 for r in steps),
         output_tokens=sum(r.get("output_tokens") or 0 for r in steps),
-        run_id=result.run_id,
+        run_id=result.run_id, service_found=c.facts.service_id, expected_service=scenario.service_id,
+        access_refused=_access_refused(result),
     )
 
 
 def run_cases(scenarios: Iterable[Scenario], provider_for: Callable[[Scenario], LlmProvider], *,
               log_dir: Path | None = None, between: Callable[[], None] | None = None) -> list[CaseOutcome]:
     """Run several scenarios. `provider_for` gives the LLM for each one; `between` runs between cases (a pause)."""
-    outcomes = []
+    outcomes: list[CaseOutcome] = []
+    scenarios = list(scenarios)
     for index, scenario in enumerate(scenarios):
+        if outcomes and outcomes[-1].access_refused:
+            # Access refused (HTTP 401/403): every later case would fail the same way.
+            outcomes += [not_run(s) for s in scenarios[index:]]
+            break
         if index and between:
             between()
         outcomes.append(run_case(scenario, provider_for(scenario), log_dir=log_dir))
@@ -209,6 +237,9 @@ def summary(outcomes: list[CaseOutcome]) -> dict[str, Any]:
         "invalid": sorted(o.scenario_id for o in outcomes if not o.valid),
         "distinct_tool_paths": len({o.tool_path for o in outcomes}),
         "stopped_early": sorted(o.scenario_id for o in outcomes if o.status == "stopped"),
+        "not_run": sorted(o.scenario_id for o in outcomes if o.status == "not_run"),
+        "wrong_service": sorted(o.scenario_id for o in outcomes
+                                if o.status != "not_run" and o.service_found != o.expected_service),
         "not_matched": sorted(o.scenario_id for o in outcomes if not o.matched),
     }
 

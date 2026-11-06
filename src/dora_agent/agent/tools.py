@@ -116,6 +116,7 @@ class ToolOutcome(BaseModel):
     content: dict[str, Any]
     facts_recorded: tuple[str, ...] = ()
     error: str | None = None
+    repeat: bool = False  # True if this was a repeated identical lookup, answered from memory
 
 
 @dataclass
@@ -130,6 +131,29 @@ class RunContext:
     pending_questions: list[str] = field(default_factory=list)
     last_classification: Classification | None = None
     alerts_checked: bool = False  # used by the gate check in loop.py
+    # Block 5 step 5 (approved by Sam): never ask the same question twice in one run.
+    asked: set[str] = field(default_factory=set)
+    # Lookups that ran successfully: (tool, service_id or None). Used to tell when only a human can help.
+    lookups_done: set[tuple[str, str | None]] = field(default_factory=set)
+    # Earlier results of read-only lookups, by tool and exact arguments (repeated calls).
+    remembered: dict[str, dict[str, Any]] = field(default_factory=dict)
+    repeats: int = 0
+
+    def queue_question(self, name: str) -> bool:
+        """Queue a fixed question unless it was already asked in this run. True if it was queued."""
+        if name in self.asked:
+            return False
+        self.asked.add(name)
+        self.pending_questions.append(name)
+        return True
+
+    def lookup_done(self, tool: str) -> bool:
+        """Has this system lookup already run for the incident? Security alerts count for any service."""
+        if tool == "get_security_alerts":
+            return self.alerts_checked
+        if tool == "get_service":
+            return self.incident_service is not None
+        return self.incident_service is not None and (tool, self.incident_service) in self.lookups_done
 
 
 @dataclass(frozen=True)
@@ -163,6 +187,13 @@ class Toolbox:
             # Field names only, never the input values, so hostile text does not travel back.
             fields = sorted({".".join(str(p) for p in e["loc"]) or "arguments" for e in error.errors()})
             return _refused(call.name, f"invalid arguments: {', '.join(fields)[:200]}")
+        key = self._memory_key(call.name, args)
+        if key is not None and key in self.context.remembered:
+            # Same lookup, same arguments: the bank data has not changed, so give back the earlier result
+            # instead of calling the system again. Counted in the loop and in the decision log.
+            self.context.repeats += 1
+            return ToolOutcome(tool=call.name, ok=True, repeat=True,
+                               content={**self.context.remembered[key], "note": REPEAT_NOTE})
         try:
             outcome = tool.handler(self, args)
         except (InvalidQuery, ValueProblem) as problem:
@@ -170,7 +201,21 @@ class Toolbox:
         text = json.dumps(outcome.content, default=str)
         if len(text) > self._max_result_chars:
             return _refused(call.name, "result too large; narrow the search")
+        if outcome.ok and call.name in LOOKUPS:
+            self.context.lookups_done.add((call.name, getattr(args, "service_id", None)))
+            if key is not None:
+                self.context.remembered[key] = {k: v for k, v in outcome.content.items()
+                                                if k not in ("note", "facts_recorded")}
         return outcome
+
+    def _memory_key(self, name: str, args: Args) -> str | None:
+        """Key for remembering a read-only lookup: tool name plus exact arguments. None = never remembered."""
+        if name not in LOOKUPS:
+            return None
+        extra = None
+        if name == "get_daily_averages":
+            extra = _daily_averages_date(self)  # the date is chosen by code and can change during a run
+        return json.dumps([name, args.model_dump(mode="json"), extra], sort_keys=True, default=str)
 
     # ---------- helpers for handlers ----------
 
@@ -193,6 +238,16 @@ class Toolbox:
             self.context.offered[record_id(record)] = (kind, record)
         ids = ", ".join(record_id(r) for r in records)
         return [], f"several records ({ids}): call use_record with the one that matches this incident"
+
+
+# Read-only bank lookups. Only these are remembered for repeats; run_rules, ask_human, suggest_facts
+# and use_record always run, because their result can change during a run.
+LOOKUPS = frozenset({
+    "find_service", "get_service", "get_outage_timeline", "get_client_impact", "get_daily_averages",
+    "get_security_alerts", "get_suppliers_for_service", "get_supplier", "get_supplier_notices",
+})
+REPEAT_NOTE = ("repeated call: same result as before, nothing new. Choose another tool from where_to_find, "
+               "or ask_human.")
 
 
 def _refused(tool: str, reason: str) -> ToolOutcome:
@@ -249,12 +304,16 @@ def _get_client_impact(box: Toolbox, args: WindowArgs) -> ToolOutcome:
 
 def _get_daily_averages(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
     # The date is chosen by plain code, not the LLM: the incident's earliest known time, else the reported time.
-    facts = box._store.snapshot()
-    start = facts.usable("incident_start") or facts.usable("detected_at") or box.context.reported_at
-    result = connectors.get_daily_averages(args.service_id, start.date().isoformat())
+    result = connectors.get_daily_averages(args.service_id, _daily_averages_date(box))
     if not box._is_incident_service(args.service_id):
         return _ok("get_daily_averages", _dump(result), note="information only: not the incident service")
     return _ok("get_daily_averages", _dump(result), mapping.map_daily_averages(box._store, result))
+
+
+def _daily_averages_date(box: Toolbox) -> str:
+    facts = box._store.snapshot()
+    start = facts.usable("incident_start") or facts.usable("detected_at") or box.context.reported_at
+    return start.date().isoformat()
 
 
 def _get_security_alerts(box: Toolbox, args: AlertArgs) -> ToolOutcome:
@@ -314,9 +373,16 @@ def _ask_human(box: Toolbox, args: AskArgs) -> ToolOutcome:
         return _refused("ask_human", f"no fixed question for: {', '.join(unknown)}")
     for name in args.facts:
         if name not in box.context.pending_questions:
-            box.context.pending_questions.append(name)
-    return _ok("ask_human", {"queued": [QUESTIONS[n].text for n in box.context.pending_questions],
-                             "note": "the run pauses here; the human answers these and reviews all suggestions"})
+            box.context.queue_question(name)
+    pending = box.context.pending_questions
+    already = [n for n in dict.fromkeys(args.facts) if n in box.context.asked and n not in pending]
+    content = {"queued": [QUESTIONS[n].text for n in box.context.pending_questions],
+               "note": "the run pauses here; the human answers these and reviews all suggestions"}
+    if already:
+        content["already_asked"] = already  # never asked twice in one run
+    if not box.context.pending_questions:
+        content["note"] = "nothing new to ask: these were already asked in this run"
+    return _ok("ask_human", content)
 
 
 # Where the agent can find each fact: docs/dora-rules.md section 6, "Where Rheinbank keeps it".

@@ -13,6 +13,11 @@ Rate limits (block 5 step 5, config.toml [llm]):
 - Before each call, a TokenPacer waits if the call would go over tokens_per_minute.
 - On HTTP 429 the call waits (Groq's suggested time if sent, else 2, 4, 8 ... s) and tries again,
   at most rate_limit_retries times and at most rate_limit_max_wait_seconds in total.
+- A dropped connection gets the same waits, at most connection_retries times, inside the same total cap.
+
+Access refused (HTTP 401 or 403): the message adds a fixed hint and a one-word tag for the kind of reply
+(json, html or empty). An html reply usually means a network block (VPN, proxy), not Groq's API itself.
+check_access() asks for the model's details before a run: it uses no tokens.
 """
 
 from __future__ import annotations
@@ -34,6 +39,10 @@ ERROR_CODES = frozenset({
     "rate_limit_exceeded", "tool_use_failed", "context_length_exceeded", "json_validate_failed",
     "request_too_large", "model_not_found", "model_decommissioned", "invalid_api_key", "service_unavailable",
 })
+
+# Added to every 401/403 message. Fixed text: never the provider's own reply.
+ACCESS_HINT = ("access refused: check the key, the model permissions in the Groq console, "
+               "or the network (VPN or proxy)")
 
 
 class GroqProvider:
@@ -73,29 +82,47 @@ class GroqProvider:
         self._pacer.record(result.usage.input_tokens or estimate, result.usage.output_tokens)
         return result
 
+    def check_access(self) -> None:
+        """Ask Groq for the configured model's details. Uses no tokens. Raises LlmError if access fails."""
+        self._call(lambda: self._client.models.retrieve(self._settings.model))
+
     def _create_with_retries(self, request: dict):
+        return self._call(lambda: self._client.chat.completions.create(**request))
+
+    def _call(self, send: Callable[[], object]):
+        """Send one request, waiting and retrying on rate limits and dropped connections (config.toml [llm])."""
         settings = self._settings
-        waited, retries = 0.0, 0
+        waited, rate_retries, connection_retries = 0.0, 0, 0
         while True:
             try:
-                return self._client.chat.completions.create(**request)
+                return send()
             except groq.RateLimitError as error:
-                pause = _retry_after(error) or float(2 ** (retries + 1))
-                if retries >= settings.rate_limit_retries or waited + pause > settings.rate_limit_max_wait_seconds:
+                pause = _retry_after(error) or float(2 ** (rate_retries + 1))
+                if rate_retries >= settings.rate_limit_retries or waited + pause > settings.rate_limit_max_wait_seconds:
                     raise LlmError(f"LLM call refused: RateLimitError (HTTP 429, {_error_code(error) or 'no code'}) "
-                                   f"after {retries} retries and {waited:.0f} s waiting",
-                                   code=_error_code(error) or "rate_limit_exceeded") from None
-                self._sleep(pause)
-                waited += pause
-                retries += 1
-            except groq.APITimeoutError:
+                                   f"after {rate_retries} retries and {waited:.0f} s waiting",
+                                   code=_error_code(error) or "rate_limit_exceeded", status=429) from None
+                rate_retries += 1
+            except groq.APITimeoutError:  # a kind of connection error, so it is caught first
                 raise LlmError(f"LLM call timed out after {settings.timeout_seconds} s") from None
+            except groq.APIConnectionError:
+                pause = float(2 ** (connection_retries + 1))
+                too_long = waited + pause > settings.rate_limit_max_wait_seconds
+                if connection_retries >= settings.connection_retries or too_long:
+                    raise LlmError(f"LLM call failed: the connection to the provider failed (APIConnectionError) "
+                                   f"after {connection_retries} retries", code="connection_failed") from None
+                connection_retries += 1
             except groq.APIStatusError as error:
                 code = _error_code(error)
-                raise LlmError(f"LLM call refused: {type(error).__name__} (HTTP {error.status_code}"
-                               f"{', ' + code if code else ''})", code=code) from None
-            except groq.GroqError as error:  # base of every groq error, including connection errors
+                message = (f"LLM call refused: {type(error).__name__} "
+                           f"(HTTP {error.status_code}{', ' + code if code else ''})")
+                if error.status_code in (401, 403):
+                    message += f"; {ACCESS_HINT}; reply: {_reply_kind(error)}"
+                raise LlmError(message, code=code, status=error.status_code) from None
+            except groq.GroqError as error:  # base of every groq error
                 raise LlmError(f"LLM call failed: {type(error).__name__}") from None
+            self._sleep(pause)
+            waited += pause
 
 
 def _error_code(error: "groq.APIStatusError") -> str | None:
@@ -107,6 +134,20 @@ def _error_code(error: "groq.APIStatusError") -> str | None:
     if not isinstance(code, str) or not code:
         return None
     return code if code in ERROR_CODES else "other"
+
+
+def _reply_kind(error: "groq.APIStatusError") -> str:
+    """One word for what kind of reply came back: json, html, empty or other. Never the reply itself."""
+    try:
+        kind = error.response.headers.get("content-type", "").lower()
+        empty = not error.response.content
+    except (AttributeError, TypeError):
+        return "other"
+    if empty:
+        return "empty"
+    if "json" in kind:
+        return "json"
+    return "html" if "html" in kind else "other"
 
 
 def _retry_after(error: "groq.APIStatusError") -> float | None:

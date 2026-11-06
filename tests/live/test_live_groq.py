@@ -7,6 +7,9 @@ Optional:
     LIVE_CASES=C01,N01,B03   run only these scenarios (default: all 27)
     LIVE_PAUSE_SECONDS=60    pause between cases, to stay under Groq rate limits (default 60)
 
+Before any case, a free access check (no tokens) asks Groq for the model's details. If access is
+refused (key, model permissions, or a network block such as a VPN), all tests stop with a plain message.
+
 What these tests check: the runs complete, the result always comes from the rules engine,
 the key never reaches a log or the report, and the real model takes different tool paths.
 What they RECORD (not assert): which result each case got and which tools the model chose.
@@ -22,7 +25,7 @@ import pytest
 
 from dora_agent.config import PROJECT_ROOT, llm_settings
 from dora_agent.evaluation.case_runner import load_scenarios, run_cases, summary, table, write_report
-from dora_agent.llm import get_provider
+from dora_agent.llm import LlmError, get_provider
 from dora_agent.rules import RULE_VERSION
 
 KEY_ENV = llm_settings().api_key_env
@@ -53,6 +56,10 @@ def live_run():
     run_dir = OUT_DIR / stamp
     pause = float(os.environ.get("LIVE_PAUSE_SECONDS", "60"))
     provider = get_provider()  # one Groq client for all cases
+    try:
+        provider.check_access()  # uses no tokens
+    except LlmError as error:
+        pytest.fail(f"Groq access check failed before any case ran: {error}", pytrace=False)
     outcomes = run_cases(_selected(), lambda scenario: provider, log_dir=run_dir / "decision_logs",
                          between=lambda: time.sleep(pause))
     report = run_dir / "report.json"

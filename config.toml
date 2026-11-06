@@ -36,8 +36,11 @@ temperature = 0
 # Rate limits (HTTP 429): how many times one call waits and tries again. The wait is the one the
 # provider suggests, if it sends one, else 2, 4, 8, 16 ... seconds.
 rate_limit_retries = 4
-# Most seconds one LLM call may spend waiting on rate limits, in total. Keeps every run bounded (hard rule 8).
+# Most seconds one LLM call may spend waiting on rate limits and dropped connections, in total.
+# Keeps every run bounded (hard rule 8).
 rate_limit_max_wait_seconds = 90
+# Dropped connections: how many times one call waits and tries again (same waits, same total cap).
+connection_retries = 2
 # Pace calls to stay under this many tokens per minute (Groq free tier: 8000). 0 = no pacing.
 tokens_per_minute = 8000
 
@@ -59,3 +62,6 @@ max_tool_result_chars = 8000
 # Security alert search around the reported time when the gate depends only on G-c (gate check).
 gate_check_alert_days_before = 7
 gate_check_alert_days_after = 1
+# Most repeated identical lookups in one run. A repeat gets the earlier result back, not a new lookup.
+# After this many, the agent stops asking the LLM and goes to the human questions, or ends.
+max_repeated_calls = 2

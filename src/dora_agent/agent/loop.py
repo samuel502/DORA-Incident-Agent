@@ -12,6 +12,16 @@ plain code checks the security alerts (if the LLM has not), and if no successful
 it asks the human the one malicious-access question, shown in the same round as the ticket review.
 A missing security alert alone never rules out G-c.
 
+After every step (block 5 step 5, approved by Sam):
+- Plain code runs the rules engine on the stored facts. A final result (major, not major, not an incident)
+  ends the run at once. The LLM does not need to call run_rules for that.
+- If every fact that still decides the result can only come from a human (its system lookups have all
+  run, per where_to_find), code asks the fixed questions itself. It does not wait for the LLM to do it.
+- No question is asked twice in one run. If the only help left is a question already asked
+  (for example, answered "unsure"), the run ends with the result open: stop reason "no_more_sources".
+- Repeated identical lookups are answered from memory (tools.py). After max_repeated_calls repeats,
+  the LLM is not asked again: the run goes to the human questions, or ends.
+
 A run can pause for the human: `start()` or `resume()` return status "needs_human" with the fixed
 questions and the list of ticket suggestions to review. The interface (block 6) or the test harness
 answers through `resume()`. The LLM never sees the human desk.
@@ -31,7 +41,7 @@ from dora_agent.agent.fact_store import Conflict, FactStore, ReviewDecision, Rev
 from dora_agent.agent.prompts import (REPAIR_MESSAGE, new_marker_code, system_prompt, task_message,
                                       tool_message)
 from dora_agent.agent.questions import AnswerProblem, QUESTIONS, interpret_answer
-from dora_agent.agent.tools import RunContext, Toolbox
+from dora_agent.agent.tools import WHERE_TO_FIND, RunContext, Toolbox, check_first
 from dora_agent.audit import DecisionLog
 from dora_agent.config import AgentLimits, agent_limits, llm_settings
 from dora_agent.llm.provider import LlmError, LlmProvider, Message, ToolCall
@@ -42,7 +52,11 @@ FINAL = {"major", "not_major", "not_an_incident"}
 
 Status = Literal["finished", "needs_human", "stopped"]
 StopReason = Literal["final_result", "needs_human", "llm_finished", "step_limit", "tool_call_limit",
-                     "human_round_limit", "llm_error"]
+                     "human_round_limit", "llm_error", "repeat_limit", "no_more_sources"]
+
+# Tools through which only a human can supply a fact: a fixed question, or a ticket suggestion a human confirms.
+HUMAN_TOOLS = frozenset({"ask_human", "suggest_facts"})
+HumanOnly = Literal["not_yet", "ask", "done"]
 
 
 class RunProblem(ValueError):
@@ -161,9 +175,14 @@ class AgentRun:
         self._log_new_events()
         self._context.pending_questions.clear()
 
-        current = classify(self._store.snapshot(), self._context.as_of)
+        current = self._rules_check()
         if current.result in FINAL:
             return self._end("finished", "final_result")
+        only_human = self._human_only(current)
+        if only_human == "ask":
+            return self._settle(current)
+        if only_human == "done":
+            return self._end("finished", "no_more_sources")
         self._messages.append(Message(role="user", content=(
             "The human has answered and reviewed the suggestions. Facts confirmed by a human are now used. "
             "Check run_rules and look up what is still missing, or stop if nothing more can help.")))
@@ -179,7 +198,7 @@ class AgentRun:
             try:
                 response = self._provider.chat(self._messages, self._toolbox.specs())
             except LlmError as error:
-                self._log.write("llm_error", error=str(error), code=error.code)
+                self._log.write("llm_error", error=str(error), code=error.code, status=error.status)
                 if error.code == "tool_use_failed" and not self._repairing:
                     # The provider refused an unreadable tool call. Say so once and let the LLM try again.
                     # The failed call counts as a step, so the step limit still applies (hard rule 8).
@@ -211,19 +230,31 @@ class AgentRun:
                 self._run_tool(call, by="llm")
             if limit_hit:
                 return self._end("stopped", "tool_call_limit")
-            last = self._context.last_classification
-            if last is not None and last.result in FINAL and any(c.name == "run_rules" for c in response.tool_calls):
+            # The rules engine after every step, in code: a final result ends the run at once.
+            current = self._rules_check()
+            if current.result in FINAL:
                 return self._end("finished", "final_result")
             if self._context.pending_questions:
-                return self._settle()
+                return self._settle(current)
+            if self._context.repeats >= limits.max_repeated_calls:
+                self._log.write("repeat_limit", repeats=self._context.repeats,
+                                note="the LLM repeated identical lookups: not asking it again")
+                return self._settle(current, quiet_end="repeat_limit")
+            only_human = self._human_only(current)
+            if only_human == "ask":
+                return self._settle(current)
+            if only_human == "done":
+                return self._end("finished", "no_more_sources")
 
     def _run_tool(self, call: ToolCall, by: str) -> None:
         outcome = self._toolbox.run(call)
-        self._tool_calls += 1
-        label = call.name[:60] + ("" if by == "llm" else f" ({by})") + ("" if outcome.ok else " [refused]")
+        self._tool_calls += 1  # a repeat answered from memory counts too
+        label = (call.name[:60] + ("" if by == "llm" else f" ({by})") + (" (repeat)" if outcome.repeat else "")
+                 + ("" if outcome.ok else " [refused]"))
         self._tool_path.append(label)
         self._log.write("tool_call", by=by, tool=call.name[:60], arguments=call.arguments,
-                        ok=outcome.ok, error=outcome.error, facts_recorded=list(outcome.facts_recorded))
+                        ok=outcome.ok, error=outcome.error, facts_recorded=list(outcome.facts_recorded),
+                        repeat=outcome.repeat)
         self._log_new_events()
         if by == "llm":
             self._reply(call, outcome.content)
@@ -231,26 +262,68 @@ class AgentRun:
     def _reply(self, call: ToolCall, content: dict) -> None:
         self._messages.append(Message(role="tool", tool_call_id=call.call_id, content=tool_message(content, self._code)))
 
-    def _settle(self) -> RunResult:
-        """The LLM is done or wants a human. Apply the gate check, then pause, finish or stop."""
+    def _rules_check(self) -> Classification:
+        """Run the rules engine on the stored facts (plain code, hard rule 1) and log the result."""
         current = classify(self._store.snapshot(), self._context.as_of)
+        self._log.write("rules_check", result=current.result, missing=len(current.missing),
+                        check_first=check_first(current))
+        return current
+
+    def _settle(self, current: Classification | None = None, quiet_end: StopReason = "llm_finished") -> RunResult:
+        """The LLM is done, wants a human, or is not asked again. Apply the checks, then pause, finish or stop."""
+        current = current or self._rules_check()
         if current.result in FINAL:
             return self._end("finished", "final_result")
-        self._gate_check(current)
+        blocked = self._gate_check(current)
+        if not self._context.pending_questions and self._human_only(current) == "done":
+            blocked = True
         if self._context.pending_questions or self._store.review_items():
             if self._human_rounds >= self._limits.max_human_rounds:
                 return self._end("stopped", "human_round_limit")
             return self._end("needs_human", "needs_human")
-        return self._end("finished", "llm_finished")
+        return self._end("finished", "no_more_sources" if blocked else quiet_end)
 
-    def _gate_check(self, current: Classification) -> None:
-        """If the gate depends only on G-c, make sure the alerts were checked and the human is asked."""
+    def _human_only(self, current: Classification) -> HumanOnly:
+        """Can the facts that still decide the result only come from a human now? If so, ask them.
+
+        Targets: check_first if it is not empty, otherwise everything missing. A target is human-only once
+        every system lookup where_to_find names for it has run in this run. If all targets are human-only,
+        their fixed questions are queued ("ask"). If they were all asked already, nothing is left ("done").
+        """
+        targets = check_first(current) or list(current.missing)
+        if not targets:
+            return "not_yet"
+        for name in targets:
+            systems = [t for t in WHERE_TO_FIND.get(name, ("suggest_facts",)) if t not in HUMAN_TOOLS]
+            if not all(self._context.lookup_done(t) for t in systems):
+                return "not_yet"  # a system may still know it
+        askable = [name for name in targets if name in QUESTIONS]
+        if "malicious_access" in askable and self._store.snapshot().usable("malicious_access") is None:
+            # G-c and T5-b need a successful malicious access first (RTS-C Art. 6(c), Art. 9(5)(b)).
+            # Where it happened and possible data loss only matter after a "yes", so ask that question first.
+            askable = ["malicious_access"]
+        if not askable:
+            return "not_yet"  # facts without a fixed question: the LLM may still find them in the ticket
+        queued = [name for name in askable if self._context.queue_question(name)]
+        if queued:
+            self._log.write("human_only", note="only a human can supply what is still missing: asking",
+                            asked=queued)
+            return "ask"
+        self._log.write("human_only", note="only a human can help, and these were already asked in this run",
+                        already_asked=askable)
+        return "done"
+
+    def _gate_check(self, current: Classification) -> bool:
+        """If the gate depends only on G-c, make sure the alerts were checked and the human is asked.
+
+        Returns True if the question was needed but had already been asked in this run (never asked twice).
+        """
         gate = current.gate
         if gate is None or gate.status != UNKNOWN:
-            return
+            return False
         status = {c.check_id: c.status for c in gate.checks}
         if status.get("G-a") != NOT_MET or status.get("G-b") != NOT_MET:
-            return  # the gate does not depend only on G-c
+            return False  # the gate does not depend only on G-c
         if not self._context.alerts_checked:
             start = self._context.reported_at - timedelta(days=self._limits.gate_check_alert_days_before)
             end = self._context.reported_at + timedelta(days=self._limits.gate_check_alert_days_after)
@@ -262,9 +335,12 @@ class AgentRun:
                                     raw_arguments=""), by="gate check")
         facts = self._store.snapshot()
         if facts.usable("malicious_access") is None and "malicious_access" not in self._context.pending_questions:
-            # No confirmed answer yet: a missing or unconfirmed alert never rules out G-c. Ask the human.
-            self._context.pending_questions.append("malicious_access")
+            # No confirmed answer yet: a missing or unconfirmed alert never rules out G-c. Ask the human, once.
+            if not self._context.queue_question("malicious_access"):
+                self._log.write("gate_check", note="malicious access was already asked in this run: not again")
+                return True
             self._log.write("gate_check", note="no confirmed answer on malicious access: asking the human")
+        return False
 
     def _log_new_events(self) -> None:
         events = self._store.events
@@ -287,6 +363,9 @@ class AgentRun:
             "tool_call_limit": f"Stopped: tool call limit reached. {classification.summary}",
             "human_round_limit": f"Stopped: too many rounds of questions. {classification.summary}",
             "llm_error": f"Stopped: the LLM could not be reached ({detail}). {classification.summary}",
+            "repeat_limit": f"Stopped asking the LLM: it kept repeating the same lookups. {classification.summary}",
+            "no_more_sources": ("Nothing more can be found: what is still missing can only come from a human, "
+                                f"and it was already asked. {classification.summary}"),
         }[reason]
         if conflicts:
             message += f" {len(conflicts)} conflict(s) between a system and a human answer: please check."

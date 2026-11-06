@@ -28,11 +28,13 @@ class LlmError(Exception):
     The message is always short and plain. It never contains the API key or the provider's raw error text.
     `code` is a short error code from a fixed list (e.g. "rate_limit_exceeded", "tool_use_failed"),
     "other" for anything not on the list, or None if the provider sent none.
+    `status` is the HTTP status, if there was one (401 and 403 mean access was refused).
     """
 
-    def __init__(self, message: str, code: str | None = None):
+    def __init__(self, message: str, code: str | None = None, status: int | None = None):
         super().__init__(message)
         self.code = code
+        self.status = status
 
 
 class ToolSpec(Frozen):

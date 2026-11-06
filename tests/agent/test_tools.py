@@ -379,3 +379,8 @@ def test_instructions_ask_for_batched_lookups_and_keep_the_checklist():
     assert "ONE answer" in SYSTEM_PROMPT
     assert "check_first" in SYSTEM_PROMPT and "where_to_find" in SYSTEM_PROMPT
     assert "CHECKLIST OF FACTS" in SYSTEM_PROMPT  # project brief: the checklist stays in the instructions
+
+
+def test_instructions_say_to_start_from_alerts_when_no_service_is_named():
+    # Sam, block 5 step 5 (6b): B03's ticket names no service; the brief says that path starts with the alerts.
+    assert "If the ticket names no service, check security alerts and monitoring first" in SYSTEM_PROMPT

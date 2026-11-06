@@ -20,6 +20,8 @@ SYSTEM_PROMPT = """You help Rheinbank's incident team collect the facts needed t
 
 YOUR JOB
 - First find the service: find_service, then get_service. Then call run_rules.
+  If the ticket names no service, check security alerts and monitoring first, then pick the service
+  from what they show. Do not guess a service from loose words in the ticket.
 - Choose every next tool from the latest run_rules result, not from a fixed order:
   facts in check_first come first (if they settle it, nothing else matters), then the rest of missing.
   where_to_find lists, for each tool, the missing facts it can supply. Skip lookups that supply none.

@@ -103,8 +103,8 @@ def test_empty_answer_raises_llm_error():
 # ---------- errors: short, safe, never the provider's raw text ----------
 
 
-def status_error(cls, code, body=None, headers=None):
-    response = httpx.Response(code, request=REQUEST, headers=headers or {})
+def status_error(cls, code, body=None, headers=None, content=b""):
+    response = httpx.Response(code, request=REQUEST, headers=headers or {}, content=content)
     return cls(f"provider said something containing {FAKE_KEY}", response=response, body=body)
 
 
@@ -244,3 +244,87 @@ def test_calls_are_paced_to_the_tokens_per_minute_limit():
     assert slept == []
     provider.chat([Message(role="user", content="x")], [])  # 11,000 used: must wait for the minute to pass
     assert len(slept) == 1 and 59 < slept[0] <= 60.2
+
+
+# ---------- dropped connections, refused access, the access check (block 5 step 5) ----------
+
+
+def connection_error():
+    return groq.APIConnectionError(message=f"conn {FAKE_KEY}", request=REQUEST)
+
+
+def test_dropped_connection_waits_and_retries_then_succeeds():
+    slept = []
+    client = Flaky([connection_error()], answer("ok"))
+    result = GroqProvider(llm_settings(), client=client, sleep=slept.append).chat(
+        [Message(role="user", content="x")], [])
+    assert result.text == "ok" and slept == [2.0]
+
+
+def test_dropped_connection_gives_up_after_the_configured_retries():
+    slept = []
+    client = StandInClient(error=connection_error())
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client, sleep=slept.append).chat([Message(role="user", content="x")], [])
+    assert len(slept) == llm_settings().connection_retries
+    assert caught.value.code == "connection_failed"
+    assert "connection to the provider failed" in str(caught.value) and FAKE_KEY not in str(caught.value)
+
+
+def test_timeout_is_not_retried_as_a_connection_error():
+    slept = []
+    client = StandInClient(error=groq.APITimeoutError(request=REQUEST))
+    with pytest.raises(LlmError, match="timed out"):
+        GroqProvider(llm_settings(), client=client, sleep=slept.append).chat([Message(role="user", content="x")], [])
+    assert slept == []
+
+
+@pytest.mark.parametrize("headers, content, kind", [
+    ({"content-type": "text/html; charset=utf-8"}, b"<html>Access denied</html>", "html"),
+    ({"content-type": "application/json"}, b'{"error": {}}', "json"),
+    ({}, b"", "empty"),
+])
+def test_refused_access_gets_a_plain_hint_and_the_reply_kind(headers, content, kind):
+    client = StandInClient(error=status_error(groq.PermissionDeniedError, 403, headers=headers, content=content))
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client).chat([Message(role="user", content="x")], [])
+    text = str(caught.value)
+    assert caught.value.status == 403
+    assert "HTTP 403" in text and "VPN" in text and f"reply: {kind}" in text
+    assert "Access denied" not in text and FAKE_KEY not in text  # never the reply itself
+
+
+def test_wrong_key_gets_the_same_hint():
+    client = StandInClient(error=status_error(groq.AuthenticationError, 401))
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client).chat([Message(role="user", content="x")], [])
+    assert caught.value.status == 401 and "check the key" in str(caught.value)
+
+
+class ModelsClient(StandInClient):
+    def __init__(self, error=None):
+        super().__init__(answer("unused"))
+        self.retrieved = []
+
+        def retrieve(model):
+            self.retrieved.append(model)
+            if error:
+                raise error
+            return SimpleNamespace(id=model)
+
+        self.models = SimpleNamespace(retrieve=retrieve)
+
+
+def test_access_check_asks_for_the_model_and_uses_no_tokens():
+    client = ModelsClient()
+    GroqProvider(llm_settings(), client=client).check_access()
+    assert client.retrieved == ["openai/gpt-oss-120b"]
+    assert client.requests == []  # no chat call: no tokens
+
+
+def test_access_check_reports_a_block_plainly():
+    client = ModelsClient(error=status_error(groq.PermissionDeniedError, 403,
+                                             headers={"content-type": "text/html"}, content=b"<html></html>"))
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client).check_access()
+    assert caught.value.status == 403 and "reply: html" in str(caught.value)

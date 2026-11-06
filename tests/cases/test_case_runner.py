@@ -203,3 +203,33 @@ def test_a_run_that_ended_on_an_llm_error_never_counts_as_matched():
     outcome = run_case(scenario, RateLimited())
     assert (outcome.stop_reason, outcome.valid, outcome.matched) == ("llm_error", False, False)
     assert summary([outcome])["invalid"] == ["B03"]
+
+
+# ---------- wrong service, refused access (block 5 step 5) ----------
+
+
+def test_a_run_on_the_wrong_service_never_counts():
+    from dora_agent.llm.fake_provider import FakeProvider, call, say
+
+    # Live run 6 Nov 2026: for B03 the model settled on SVC-MFT. The scenario's service is SVC-LOAN.
+    scenario = next(s for s in SCENARIOS if s.scenario_id == "B03")
+    outcome = run_case(scenario, FakeProvider([call("get_service", service_id="SVC-MFT")] + [say("done")] * 5))
+    assert outcome.service_found == "SVC-MFT" and outcome.expected_service == "SVC-LOAN"
+    assert not outcome.valid and not outcome.matched
+    assert summary([outcome])["wrong_service"] == ["B03"]
+
+
+def test_refused_access_stops_the_remaining_cases():
+    from dora_agent.llm.provider import LlmError
+
+    class Refused:
+        name = "fake"
+
+        def chat(self, messages, tools):
+            raise LlmError("LLM call refused: PermissionDeniedError (HTTP 403); access refused", status=403)
+
+    outcomes = run_cases(SCENARIOS[:4], lambda s: Refused())
+    assert outcomes[0].access_refused and outcomes[0].status == "stopped"
+    assert [o.status for o in outcomes[1:]] == ["not_run"] * 3
+    result = summary(outcomes)
+    assert result["not_run"] == sorted(s.scenario_id for s in SCENARIOS[1:4]) and result["matched"] == 0

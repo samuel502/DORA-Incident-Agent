@@ -52,8 +52,11 @@ def b01_run(**kwargs):
 def test_b01_online_banking_path_is_major():
     result = b01_run().start()
     assert (result.status, result.stop_reason, result.classification.result) == ("finished", "final_result", "major")
+    # Block 5 step 5: code runs the rules engine after every step, so the run ends as soon as the facts
+    # make it major. The scripted run_rules call is never needed.
     assert result.tool_path == ("find_service", "get_service", "get_outage_timeline", "get_client_impact",
-                                "get_daily_averages", "run_rules")
+                                "get_daily_averages")
+    assert result.steps_used == 3
     assert result.classification.thresholds_met == ("T1", "T3")
 
 
@@ -230,15 +233,20 @@ def small(**changes):
     return replace(agent_limits(), **changes)
 
 
+def searches(n):
+    """n lookups that are all different, so the repeat limit does not stop them first."""
+    return [call("find_service", text=f"online banking {i}") for i in range(n)]
+
+
 def test_step_limit_stops_a_looping_llm():
-    looping = FakeProvider([call("find_service", text="online banking")] * 50)
+    looping = FakeProvider(searches(50))
     result = AgentRun("x", t("2026-05-26T07:15:00Z"), looping, limits=small(max_steps=3)).start()
     assert (result.status, result.stop_reason, result.steps_used) == ("stopped", "step_limit", 3)
     assert result.classification.result == "undetermined"
 
 
 def test_tool_call_limit_per_run():
-    looping = FakeProvider([call("find_service", text="online banking")] * 50)
+    looping = FakeProvider(searches(50))
     result = AgentRun("x", t("2026-05-26T07:15:00Z"), looping,
                       limits=small(max_steps=50, max_tool_calls=4)).start()
     assert (result.stop_reason, result.tool_calls_used) == ("tool_call_limit", 4)
@@ -252,13 +260,26 @@ def test_tool_call_limit_per_step():
 
 
 def test_human_round_limit():
-    fake = FakeProvider([call("get_service", service_id="SVC-HR"), say("done"), say("still done")])
-    run = AgentRun("HR portal is slow.", t("2026-03-10T06:40:00Z"), fake, limits=small(max_human_rounds=1))
+    # Each round the LLM asks a NEW question, so a second round is needed: over the limit of 1.
+    fake = FakeProvider([call("get_service", service_id="SVC-OLB"), call("ask_human", facts=["media_coverage"]),
+                         call("ask_human", facts=["repeated_complaints"])])
+    run = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), fake, limits=small(max_human_rounds=1))
     run.start()
-    # "Unsure" leaves the question open; asking again would be a second round, over the limit of 1.
-    result = run.resume(confirmed_by="Sam", answers={"malicious_access": "unsure"})
+    result = run.resume(confirmed_by="Sam", answers={"media_coverage": "unsure"})
     assert (result.status, result.stop_reason) == ("stopped", "human_round_limit")
     assert result.classification.result == "undetermined"
+
+
+def test_unsure_is_never_asked_again_and_the_run_ends_open():
+    # Sam, block 5 step 5: no question twice in one run. After "unsure", nothing else can help N01.
+    run, fake = n01_run()
+    run.start()
+    result = run.resume(confirmed_by="Sam", answers={"malicious_access": "unsure"})
+    assert (result.status, result.stop_reason) == ("finished", "no_more_sources")
+    assert result.classification.result == "undetermined"
+    assert len(fake.calls) == 3  # no LLM call after the answer: nothing it could look up would help
+    asked = [q for r in result.trace if r["kind"] == "paused" for q in r["questions"]]
+    assert asked == ["malicious_access"]
 
 
 def test_llm_error_stops_cleanly_with_the_engine_result_so_far():
@@ -361,7 +382,7 @@ def test_one_refused_tool_call_gets_one_retry_and_counts_as_a_step():
     result = AgentRun("Online banking down since 9:10, customers can't log in.", t("2026-05-26T07:15:00Z"),
                       provider).start()
     assert result.classification.result == "major"
-    assert result.steps_used == 5  # 4 answers + the refused call
+    assert result.steps_used == 4  # 3 answers + the refused call (the run ends as major after step 3)
     assert "could not be read as a tool call" in provider.seen[1][-1].content
     [error] = [r for r in result.trace if r["kind"] == "llm_error"]
     assert error["code"] == "tool_use_failed"
@@ -388,3 +409,76 @@ def test_other_llm_errors_are_not_retried():
 
     result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), RateLimited()).start()
     assert (result.stop_reason, result.steps_used) == ("llm_error", 0)
+
+
+# ---------- block 5 step 5: repeats, human-only facts, rules after every step ----------
+
+
+def test_repeated_identical_lookup_is_answered_from_memory_and_counted():
+    seen = {}
+
+    def capture(messages):
+        seen["last"] = messages[-1].content
+        return say("done")
+
+    fake = FakeProvider([call("get_service", service_id="SVC-OLB"), call("get_daily_averages", service_id="SVC-OLB"),
+                         call("get_daily_averages", service_id="SVC-OLB"), capture])
+    result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), fake).start()
+    assert result.tool_path == ("get_service", "get_daily_averages", "get_daily_averages (repeat)")
+    assert result.tool_calls_used == 3  # the repeat counts
+    assert "repeated call: same result as before" in seen["last"]
+    [repeat] = [r for r in result.trace if r["kind"] == "tool_call" and r["repeat"]]
+    assert repeat["tool"] == "get_daily_averages"
+
+
+def test_repeat_limit_stops_asking_the_llm():
+    fake = FakeProvider([call("find_service", text="online banking")] * 10)
+    result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), fake).start()
+    assert result.stop_reason == "repeat_limit"
+    assert result.tool_path == ("find_service", "find_service (repeat)", "find_service (repeat)")
+    assert len(fake.calls) == 3  # max_repeated_calls = 2 repeats, then the LLM is not asked again
+    assert any(r["kind"] == "repeat_limit" for r in result.trace)
+
+
+def test_n01_like_the_live_model_asks_the_human_instead_of_wandering():
+    # Live run 6 Nov 2026: after the alerts showed nothing, the model fetched outage and client data and
+    # get_daily_averages three times. Now code asks the one question as soon as only a human can help.
+    fake = FakeProvider([
+        call("find_service", text="HR portal"), call("get_service", service_id="SVC-HR"), call("run_rules"),
+        call("get_security_alerts", service_id="SVC-HR", start="2026-03-10T00:00:00Z", end="2026-03-10T12:00:00Z"),
+        call("get_outage_timeline", service_id="SVC-HR"),  # never reached
+    ])
+    run = AgentRun("HR portal is slow this morning.", t("2026-03-10T06:30:00Z"), fake)
+    paused = run.start()
+    assert paused.status == "needs_human"
+    assert [q.fact_name for q in paused.questions] == ["malicious_access"]  # one question, as for the gate check
+    assert paused.tool_path[-1] == "get_security_alerts"
+    assert len(fake.calls) == 4
+    done = run.resume(confirmed_by="Sam", answers={"malicious_access": "no"})
+    assert (done.status, done.classification.result) == ("finished", "not_major")
+
+
+def test_no_human_question_while_a_system_may_still_know():
+    # SVC-OLB is critical (gate passed); client data has not been looked up yet, so code does not ask.
+    fake = FakeProvider([call("get_service", service_id="SVC-OLB"), say("done")])
+    result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), fake).start()
+    assert not any(r["kind"] == "human_only" for r in result.trace)
+    assert len(fake.calls) == 2
+
+
+def test_ask_human_never_queues_a_question_twice():
+    fake = FakeProvider([call("get_service", service_id="SVC-OLB"), call("ask_human", facts=["media_coverage"]),
+                         call("ask_human", facts=["media_coverage"]), say("done")])
+    run = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), fake)
+    run.start()
+    result = run.resume(confirmed_by="Sam", answers={"media_coverage": "unsure"})
+    assert result.questions == ()
+    assert [r["questions"] for r in result.trace if r["kind"] == "paused"] == [["media_coverage"]]
+
+
+def test_rules_check_is_logged_after_every_step_and_is_not_a_tool_call():
+    result = b01_run().start()
+    checks = [r for r in result.trace if r["kind"] == "rules_check"]
+    assert len(checks) == result.steps_used
+    assert checks[-1]["result"] == "major"
+    assert "run_rules" not in result.tool_path

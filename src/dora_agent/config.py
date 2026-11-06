@@ -55,7 +55,8 @@ class LlmSettings:
     max_output_tokens: int
     temperature: float
     rate_limit_retries: int  # waits and retries on HTTP 429
-    rate_limit_max_wait_seconds: int  # most seconds one call may wait on rate limits, in total
+    rate_limit_max_wait_seconds: int  # most seconds one call may wait on rate limits and connections, in total
+    connection_retries: int  # waits and retries on a dropped connection
     tokens_per_minute: int  # pace calls to stay under this; 0 = no pacing
 
 
@@ -79,6 +80,7 @@ def llm_settings() -> LlmSettings:
         raise ValueError("config.toml [llm] temperature must be between 0 and 2")
     limits = {}
     for name, low, high in (("rate_limit_retries", 0, 10), ("rate_limit_max_wait_seconds", 1, 600),
+                            ("connection_retries", 0, 10),
                             ("tokens_per_minute", 0, 10_000_000)):
         value = section[name]
         if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
@@ -103,6 +105,7 @@ class AgentLimits:
     max_tool_result_chars: int
     gate_check_alert_days_before: int
     gate_check_alert_days_after: int
+    max_repeated_calls: int
 
 
 @lru_cache(maxsize=1)
