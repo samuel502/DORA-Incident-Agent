@@ -20,7 +20,7 @@ from typing import Literal
 from dora_agent.notification.entity import SYNTHETIC_LEI_NOTE, ReportingEntity
 from dora_agent.rules.engine import Classification
 from dora_agent.rules.facts import Frozen, UtcTime
-from dora_agent.rules.thresholds import EU_MEMBER_STATES, MET
+from dora_agent.rules.thresholds import EEA_MEMBER_STATES, MET
 
 FilledBy = Literal["code", "ai_draft", "human"]
 # filled: has a value. not_applicable: a conditional field whose condition is not met.
@@ -219,12 +219,12 @@ def code_fields(classification: Classification, *, run_id: str, classified_at: d
           note=classification.summary)
 
     if "T4" in classification.thresholds_met:
-        # The same Member States the engine counted for T4 (RTS-C Art. 9(4)); EL is written GR as there.
+        # The same EEA Member States the engine counted for T4 (RTS-C Art. 9(4), open question 10). EL is written GR.
         states = facts.usable("affected_member_states")
-        counted = tuple(sorted({"GR" if s == "EL" else s for s in states if s in EU_MEMBER_STATES}))
-        left_out = sorted({s for s in states if s not in EU_MEMBER_STATES})
+        counted = tuple(sorted({"GR" if s == "EL" else s for s in states if s in EEA_MEMBER_STATES}))
+        left_out = sorted({s for s in states if s not in EEA_MEMBER_STATES})
         b.add("2.6", "filled", f"fact affected_member_states, from {facts.affected_member_states.source}",
-              counted, note=(f"Not listed, outside the EU: {', '.join(left_out)}." if left_out else None))
+              counted, note=(f"Not listed, outside the EEA: {', '.join(left_out)}." if left_out else None))
     else:
         b.add("2.6", "not_applicable", "rules engine",
               note="Only needed when the geographical spread threshold (T4) is met (ITS-R Annex II, 2.6).")

@@ -15,7 +15,7 @@ from dora_agent.notification.fields import (
     NotMajor,
     code_fields,
 )
-from dora_agent.rules import Fact, IncidentFacts, classify
+from dora_agent.rules import RULE_VERSION, Fact, IncidentFacts, classify
 
 UTC = timezone.utc
 AS_OF = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
@@ -166,7 +166,7 @@ def test_reference_and_times():
     assert "security_alerts" in f["2.2"].source
     assert f["2.3"].value == "2026-11-05T10:30:00Z"
     assert "rules engine" in f["2.3"].source
-    assert "1.3" in f["2.3"].note  # rule version
+    assert RULE_VERSION in f["2.3"].note  # rule version
 
 
 def test_estimated_detection_time_is_marked():
@@ -195,10 +195,17 @@ def test_t1_t4_major_criteria_and_member_states():
     assert f["2.6"].value == ("AT", "DE")
 
 
-def test_member_states_outside_eu_are_left_out_and_noted():
+def test_member_states_outside_eea_are_left_out_and_noted():
     f = build(t1_t4_facts(states=("DE", "AT", "CH")))
     assert f["2.6"].value == ("AT", "DE")
-    assert "CH" in f["2.6"].note
+    assert "outside the EEA: CH" in f["2.6"].note
+
+
+def test_norway_counts_for_t4_and_is_listed_in_2_6():
+    # Open question 10: an incident in Germany and Norway meets T4, and 2.6 lists both.
+    f = build(t1_t4_facts(states=("DE", "NO")))
+    assert f["2.6"].value == ("DE", "NO")
+    assert "geographical spread" in f["2.5"].value
 
 
 def test_member_states_not_applicable_without_t4():

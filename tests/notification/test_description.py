@@ -104,7 +104,7 @@ def test_prompt_is_only_the_fact_list():
         assert f"- {line}" in user
     assert "Online banking (SVC-OLB)" in user
     assert "Clients affected: 150,000 of 1,000,000 clients using the service" in user
-    assert "EU Member States affected: AT, DE" in user
+    assert "EEA Member States affected: AT, DE" in user
     assert f"Possible causes: {UNDER_INVESTIGATION}" in user
 
 
@@ -165,6 +165,19 @@ def test_bad_ai_text_falls_back_to_code(text, problem):
     field = description_field(result)
     assert field.filled_by == "code"
     assert problem in field.note
+
+
+def test_huge_number_from_the_ai_falls_back_instead_of_crashing():
+    # Python's int() refuses numbers this long. The check must not crash on them.
+    result, _ = draft("Online banking was down. " + "9" * 5000 + " clients were affected.")
+    assert result.written_by == "code_fallback"
+    assert "number_not_in_facts" in result.problems
+
+
+def test_leading_zeros_do_not_matter():
+    result, _ = draft("Online banking was down from 08:00 to 08:30 UTC on 2026-11-05. "
+                      "Possible causes are under investigation.")
+    assert result.written_by == "ai_draft", result.problems
 
 
 def test_tool_call_in_the_answer_falls_back_to_code():

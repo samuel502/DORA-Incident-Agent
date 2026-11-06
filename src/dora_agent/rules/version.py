@@ -3,4 +3,4 @@
 Every classification result carries this, so the log shows which rules decided it (CLAUDE.md hard rule 9).
 """
 
-RULE_VERSION = "1.3"
+RULE_VERSION = "1.4"

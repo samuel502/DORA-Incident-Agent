@@ -31,12 +31,14 @@ T3_DOWNTIME = timedelta(hours=2)  # T3-b: longer than 2 hours. RTS-C Art. 9(3)(b
 T4_MIN_STATES = 2  # T4: two or more Member States. RTS-C Art. 9(4)
 T6_COSTS_EUR = 100_000  # T6: more than EUR 100,000. RTS-C Art. 9(6)
 
-# T4 counts EU Member States only (section 3, T4). The 27 Member States as ISO codes.
+# T4 counts the 30 EEA Member States (section 3, T4, open question 10): the 27 EU Member States
+# plus Iceland, Liechtenstein and Norway (DORA in the EEA Agreement: EEA Joint Committee Decision No 40/2025).
 # Greece is "GR" in ISO and "EL" in EU usage; both are accepted.
-EU_MEMBER_STATES = frozenset(
+EEA_MEMBER_STATES = frozenset(
     {
         "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "EL", "HU", "IE",
         "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+        "IS", "LI", "NO",  # EEA EFTA States, open question 10
     }
 )
 
@@ -285,7 +287,7 @@ def check_t3(facts: IncidentFacts, as_of: datetime) -> Threshold:
 
 
 def check_t4(facts: IncidentFacts) -> Threshold:
-    """Geographical spread: impact in two or more EU Member States. RTS-C Art. 9(4), Art. 4, DORA Art. 18(1)(c)."""
+    """Geographical spread: impact in two or more EEA Member States (open question 10). RTS-C Art. 9(4), Art. 4, DORA Art. 18(1)(c)."""
     article = "RTS-C Art. 9(4)"
     states = facts.usable("affected_member_states")
     if states is None:
@@ -293,12 +295,12 @@ def check_t4(facts: IncidentFacts) -> Threshold:
                       reason=f"Member States affected: {_waiting(facts, 'affected_member_states')}",
                       missing=("affected_member_states",))
     else:
-        eu = sorted({"GR" if s == "EL" else s for s in states if s in EU_MEMBER_STATES})
-        other = sorted({s for s in states if s not in EU_MEMBER_STATES})
-        met = len(eu) >= T4_MIN_STATES
-        outside = f" (not counted, outside the EU: {', '.join(other)})" if other else ""
+        eea = sorted({"GR" if s == "EL" else s for s in states if s in EEA_MEMBER_STATES})
+        other = sorted({s for s in states if s not in EEA_MEMBER_STATES})
+        met = len(eea) >= T4_MIN_STATES
+        outside = f" (not counted, outside the EEA: {', '.join(other)})" if other else ""
         check = Check(check_id="T4", status=MET if met else NOT_MET, article=article,
-                      reason=f"EU Member States affected: {', '.join(eu) or 'none'} ({len(eu)}), "
+                      reason=f"EEA Member States affected: {', '.join(eea) or 'none'} ({len(eea)}), "
                              f"{'at least' if met else 'fewer than'} {T4_MIN_STATES}{outside}")
     return _combine("T4", "Geographical spread", article, [check])
 

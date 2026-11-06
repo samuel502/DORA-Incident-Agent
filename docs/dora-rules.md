@@ -2,7 +2,9 @@
 
 The single source of truth for the rules engine. Every rule in code must point to a line here and to its article. Nothing gets coded that isn't on this sheet.
 
-Rule version: 1.3 (6 November 2026)
+Rule version: 1.4 (6 November 2026)
+
+Changes in 1.4: T4 and field 2.6 count the 30 EEA Member States (the 27 EU Member States plus Iceland, Liechtenstein and Norway), not only the EU ones. RTS-C Art. 4 and 9(4) say "Member States" without "EU", ITS-R Annex II field 2.6 asks for EEA Member States, and DORA is part of the EEA Agreement. Open question 10 added. EEA Joint Committee decisions added to the sources. Approved by Sam on 6 November 2026.
 
 Changes in 1.3: section 5 completed with RTS-R Art. 5(2) to 5(6) (late classification, missed deadlines, weekends and bank holidays, and who the weekend rule does not apply to). Section 10 added: the content of the initial notification, from RTS-R Art. 1 and 2 and the template fields in ITS-R Annex II. ITS-R added to the sources. No classification threshold or criterion changed.
 
@@ -20,6 +22,8 @@ Verified: Sam checked the spot-check list in section 9 against the official EUR-
 | RTS-C | Commission Delegated Regulation (EU) 2024/1772 | Classification criteria (Art. 1 to 7), when an incident is major (Art. 8), thresholds (Art. 9) |
 | RTS-R | Commission Delegated Regulation (EU) 2025/301 | Content of the initial notification (Art. 1, 2), reporting deadlines (Art. 5) |
 | ITS-R | Commission Implementing Regulation (EU) 2025/302 | Template (Annex I) and data glossary with field numbers (Annex II) |
+| EEA-DORA | Decision of the EEA Joint Committee No 40/2025 (adopted 20 February 2025) | Brings DORA into the EEA Agreement (Annex IX, financial services). Why T4 counts Iceland, Liechtenstein and Norway (open question 10) |
+| EEA-RTS | Decision of the EEA Joint Committee No 137/2025 of 13 June 2025 (OJ L 2025/1843) | Brings delegated acts under DORA, among them RTS-R, into the EEA Agreement. Its entry into force depends on No 40/2025 |
 
 Official texts: EUR-Lex. RTS-C was read from the Official Journal version (OJ L, 25.6.2024). RTS-R and ITS-R were read from the Official Journal versions (OJ L, 20.2.2025, both adopted 23 October 2024).
 
@@ -105,7 +109,7 @@ How to measure (RTS-C Art. 3):
 
 ### T4. Geographical spread
 
-**RTS-C Art. 9(4) and Art. 4, criterion from DORA Art. 18(1)(c).** Met if the incident had an impact in **two or more EU Member States**.
+**RTS-C Art. 9(4) and Art. 4, criterion from DORA Art. 18(1)(c).** Met if the incident had an impact in **two or more Member States**. Version 1 counts the 30 EEA Member States: the 27 EU Member States plus Iceland (IS), Liechtenstein (LI) and Norway (NO). Countries outside the EEA (for example CH, GB, US) do not count. See open question 10.
 
 What to look at (Art. 4): clients and counterparts in other Member States, branches or group companies in other Member States, and market infrastructures or third-party providers that serve financial entities in other Member States.
 
@@ -228,6 +232,7 @@ These are interpretation points, flagged for review (for example with the PwC co
 7. **Client totals:** T1-a and T1-c compare affected clients and counterparts against all clients and counterparts using the service (RTS-C Art. 9(1)(a) and (c)). RTS-C does not say on which date to count them. Method in version 1: Rheinbank's client data keeps a yearly snapshot per service, taken on 31 December, and the tool uses the latest snapshot on or before the incident date. This is a bank method choice, not a DORA rule. Approved by Sam on 4 November 2026.
 8. **Planned window that overran:** when planned and announced downtime runs past the end of its planned window, the overrun is unplanned, so it is an incident under DORA Art. 3(8) (see open question 5). RTS-C Art. 3(2) does not say when the downtime of such an overrun starts. Method in version 1: the overrun's downtime starts at the planned end of the window and runs until normal service is restored (or the backlog is cleared, as in Art. 3(2)). Downtime inside the planned window does not count. The overrun's duration (RTS-C Art. 3(1)) also starts at the planned end of the window and runs until the incident is resolved. This is an interpretation, not a DORA rule. Found in case C16 (variant B). Approved by Sam on 5 November 2026.
 9. **T5-b and T5-a:** RTS-C Art. 9(5)(b) covers a successful, malicious and unauthorised access "not covered by" point (a). Read literally, a breach that meets T5-a would not count as T5-b, and would then need a second threshold to be major. Version 1 does not apply this exclusion: T5-b is checked on its own, whether or not T5-a is met. This follows RTS-C recital 10 (section 1: malicious unauthorised access should always be treated as major) and the case library (C06, C10, C12). Consequence in version 1: a confirmed successful, malicious, unauthorised access to Rheinbank's own systems that may result in data losses is always major. If a human confirms it may not result in data losses, T5-b is not met (it follows the wording of Art. 9(5)(b)), and the other thresholds decide. This is an interpretation, not a DORA rule. Approved by Sam on 5 November 2026.
+10. **EEA Member States for T4 and field 2.6:** RTS-C Art. 4 and Art. 9(4) say "Member States", not "EU Member States", and RTS-C is marked "Text with EEA relevance". ITS-R Annex II field 2.6 asks for the "EEA Member States" impacted. DORA was brought into the EEA Agreement by Decision of the EEA Joint Committee No 40/2025, adopted 20 February 2025 (EFTA news, 21 February 2025); it takes effect in Iceland, Liechtenstein and Norway once their constitutional requirements are met, and no date was found. Decision No 137/2025 (OJ L 2025/1843) brings RTS-R into the EEA Agreement and depends on No 40/2025. Not confirmed: whether RTS-C itself has been brought in yet. Under the EEA Agreement's horizontal rules (Protocol 1), "Member States" in an act brought into the Agreement also covers the EEA EFTA States. Method in version 1: T4 and field 2.6 count all 30 EEA Member States. Before 1.4, version 1 counted the EU Member States only; that "EU" was our wording, not the regulation's. This is an interpretation, to review with the PwC contact. Approved by Sam on 6 November 2026.
 
 ## 9. Spot-check list for Sam
 
@@ -246,6 +251,10 @@ Added in 1.3. Check against EUR-Lex (search "2025/301 EUR-Lex" or "2025/302 EUR-
 8. **Field 2.2, detection time.** ITS-R (2025/302) Annex II, field 2.2, based on RTS-R Art. 2(b). Mandatory. The moment the bank became aware of the incident, ISO 8601, UTC.
 9. **Field 2.5, classification criteria.** ITS-R (2025/302) Annex II, field 2.5, based on RTS-R Art. 2(d). Mandatory, multiple choice of 7: clients, financial counterparts and transactions affected; reputational impact; duration and service downtime; geographical spread; data losses; critical services affected; economic impact.
 10. **Field 2.7, discovery.** ITS-R (2025/302) Annex II, field 2.7, based on RTS-R Art. 2(f). Mandatory, one choice of 11: IT security; staff; internal audit; external audit; clients; financial counterparts; third-party provider; attacker; monitoring systems; authority/agency/law enforcement body; other.
+
+Added in 1.4, not yet checked (search "2025/1843 EUR-Lex" and the EFTA news of 21 February 2025, "EEA Joint Committee adopts three decisions in financial services"):
+
+11. **EEA.** Decision of the EEA Joint Committee No 137/2025 (OJ L 2025/1843): it brings RTS-R (2025/301) into the EEA Agreement, and its entry into force refers to Decision No 40/2025. The EFTA news item says DORA was brought into the EEA Agreement on 20 February 2025.
 
 ## 10. Content of the initial notification
 
@@ -283,7 +292,7 @@ General rules:
 | 2.3 | Date and time of classification as major | Mandatory | (b) | Classification under RTS-C. ISO 8601, UTC |
 | 2.4 | Description of the incident | Mandatory | (c) | High-level overview: possible causes, immediate impacts, systems affected, known or expected impact on third-party providers or other financial entities |
 | 2.5 | Classification criteria that triggered the report | Mandatory | (d) | Multiple choice: clients, financial counterparts and transactions affected; reputational impact; duration and service downtime; geographical spread; data losses; critical services affected; economic impact |
-| 2.6 | EEA Member States impacted (geographical spread) | Conditional | (e) | Only if the geographical spread threshold (T4) is met. ISO 3166 alpha-2 codes |
+| 2.6 | EEA Member States impacted (geographical spread) | Conditional | (e) | Only if the geographical spread threshold (T4) is met. ISO 3166 alpha-2 codes. The same 30 EEA Member States T4 counts (open question 10) |
 | 2.7 | Discovery of the incident | Mandatory | (f) | Choice: IT security, staff, internal audit, external audit, clients, financial counterparts, third-party provider, attacker, monitoring systems, authority/agency/law enforcement body, other |
 | 2.8 | Origin in a third-party provider or another financial entity | Conditional | (g) | Only if it originates there. Name and identification code (for example LEI) |
 | 2.9 | Activation of business continuity plan | Mandatory | (h) | Yes or no |

@@ -30,7 +30,7 @@ from dora_agent.notification.fields import NotificationField, NotMajor, criteria
 from dora_agent.notification.prompts import DESCRIPTION_SYSTEM_PROMPT, DESCRIPTION_USER_PROMPT
 from dora_agent.rules.engine import Classification
 from dora_agent.rules.facts import Frozen
-from dora_agent.rules.thresholds import EU_MEMBER_STATES
+from dora_agent.rules.thresholds import EEA_MEMBER_STATES
 
 UNDER_INVESTIGATION = "under investigation"
 WrittenBy = Literal["ai_draft", "code_fallback"]
@@ -119,9 +119,9 @@ def fact_lines(classification: Classification, causes: str | None = None) -> tup
 
     states = use("affected_member_states")
     if states:
-        eu = sorted({"GR" if s == "EL" else s for s in states if s in EU_MEMBER_STATES})
-        if eu:
-            lines.append(f"EU Member States affected: {', '.join(eu)}")
+        eea = sorted({"GR" if s == "EL" else s for s in states if s in EEA_MEMBER_STATES})
+        if eea:
+            lines.append(f"EEA Member States affected: {', '.join(eea)}")
 
     reputation = [label for label, name in (("media coverage", "media_coverage"),
                                             ("repeated client complaints", "repeated_complaints"),
@@ -152,9 +152,13 @@ def fact_lines(classification: Classification, causes: str | None = None) -> tup
 # ---------- checks on the AI's text ----------
 
 
-def _numbers(text: str) -> set[int]:
-    """Every whole number in the text, with thousands separators removed and leading zeros ignored."""
-    return {int(n) for n in _NUMBER.findall(_THOUSANDS.sub("", text))}
+def _numbers(text: str) -> set[str]:
+    """Every whole number in the text, with thousands separators removed and leading zeros ignored.
+
+    Kept as text, not converted with int(): a number thousands of digits long from the AI would make
+    int() raise, and the check must never crash (it falls back to code instead).
+    """
+    return {n.lstrip("0") or "0" for n in _NUMBER.findall(_THOUSANDS.sub("", text))}
 
 
 def check_ai_text(text: str, lines: tuple[str, ...], settings: NotificationSettings) -> tuple[str, list[str]]:

@@ -350,10 +350,29 @@ def test_t4_two_member_states_is_met():
     assert t4("DE", "AT").status == MET
 
 
-def test_t4_countries_outside_the_eu_do_not_count():
+def test_t4_countries_outside_the_eea_do_not_count():
     result = t4("DE", "GB", "US")
     assert result.status == NOT_MET
     assert "GB, US" in result.checks[0].reason
+
+
+@pytest.mark.parametrize("state", ["NO", "IS", "LI"])
+def test_t4_eea_efta_states_count(state):
+    # Open question 10: Iceland, Liechtenstein and Norway are EEA Member States (EEA JCD No 40/2025).
+    result = t4("DE", state)
+    assert result.status == MET
+    assert state in result.checks[0].reason
+
+
+def test_t4_switzerland_is_not_in_the_eea():
+    result = t4("DE", "CH")
+    assert result.status == NOT_MET
+    assert "outside the EEA: CH" in result.checks[0].reason
+
+
+def test_t4_list_is_the_30_eea_states():
+    from dora_agent.rules.thresholds import EEA_MEMBER_STATES
+    assert len(EEA_MEMBER_STATES - {"EL"}) == 30
 
 
 def test_t4_greece_counted_once_under_either_code():
