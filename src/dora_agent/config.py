@@ -122,3 +122,25 @@ def agent_limits() -> AgentLimits:
     if values["gate_check_alert_days_before"] + values["gate_check_alert_days_after"] > 31:
         raise ValueError("config.toml [agent] gate check alert window must be at most 31 days (connector limit)")
     return AgentLimits(**values)
+
+
+@dataclass(frozen=True)
+class NotificationSettings:
+    """The [notification] section: limits for the draft initial notification (block 5b)."""
+
+    max_description_chars: int
+    max_causes_chars: int
+
+
+@lru_cache(maxsize=1)
+def notification_settings() -> NotificationSettings:
+    """Read the [notification] section once. Every value must be a whole number from 1 to 10,000."""
+    with CONFIG_PATH.open("rb") as handle:
+        section = tomllib.load(handle)["notification"]
+    values = {}
+    for field in fields(NotificationSettings):
+        value = section[field.name]
+        if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 10_000:
+            raise ValueError(f"config.toml [notification] {field.name} must be a whole number from 1 to 10000")
+        values[field.name] = value
+    return NotificationSettings(**values)

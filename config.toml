@@ -65,3 +65,11 @@ gate_check_alert_days_after = 1
 # Most repeated identical lookups in one run. A repeat gets the earlier result back, not a new lookup.
 # After this many, the agent stops asking the LLM and goes to the human questions, or ends.
 max_repeated_calls = 2
+
+[notification]
+# Block 5b: the draft initial notification. Nothing is ever sent.
+# Longest description (field 2.4) accepted from the AI, in characters. Longer drafts are replaced by
+# the description written by code. RTS-R recital 2: keep the initial notification to the most significant facts.
+max_description_chars = 1500
+# Longest text a human may type for the possible causes (goes into field 2.4).
+max_causes_chars = 500
