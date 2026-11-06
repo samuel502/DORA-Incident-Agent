@@ -1,0 +1,20 @@
+{
+  "about": "SYNTHETIC DATA. Reporting details of Rheinbank AG, a fictional bank, for the draft initial notification (ITS-R Annex II, fields 1.2 to 1.15). Not a real company. The LEI is fake: its check digits are 00, which fails the ISO 17442 check, so it can never match a real LEI. Phone numbers start with 0 after +49, which no German number does. Email addresses use the reserved .example domain (RFC 2606). No real person is named.",
+  "synthetic": true,
+  "entity": {
+    "legal_name": "Rheinbank AG",
+    "lei": "FAKE00RHEINBANK00000",
+    "reporting_currency": "EUR",
+    "parent_undertaking": null,
+    "primary_contact": {
+      "name": "Erika Mustermann (fictional)",
+      "email": "dora-reporting@rheinbank.example",
+      "telephone": "+49 0000 000001"
+    },
+    "second_contact": {
+      "name": "ICT Incident Response Team (fictional)",
+      "email": "ict-incident-team@rheinbank.example",
+      "telephone": "+49 0000 000002"
+    }
+  }
+}
