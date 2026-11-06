@@ -483,3 +483,30 @@ def test_rules_check_is_logged_after_every_step_and_is_not_a_tool_call():
     assert len(checks) == result.steps_used
     assert checks[-1]["result"] == "major"
     assert "run_rules" not in result.tool_path
+
+
+# ---------- block 6: the run's own log, shared with the notification draft and approval ----------
+
+
+def test_run_log_is_the_runs_own_log(tmp_path):
+    run = b01_run(log_dir=tmp_path, run_id="sharedlog01")
+    result = run.start()
+    assert run.log.run_id == "sharedlog01"
+    assert tuple(run.log.records) == result.trace
+
+
+def test_records_added_later_land_in_the_same_file_with_numbering_going_on(tmp_path):
+    run = b01_run(log_dir=tmp_path, run_id="sharedlog02")
+    result = run.start()
+    run.log.write("notification_draft", sent=False)
+    lines = (tmp_path / "sharedlog02.jsonl").read_text(encoding="utf-8").splitlines()
+    records = [json.loads(line) for line in lines]
+    assert len(records) == len(result.trace) + 1
+    assert records[-1]["kind"] == "notification_draft"
+    assert records[-1]["seq"] == records[-2]["seq"] + 1
+
+
+def test_run_log_cannot_be_replaced():
+    run = b01_run()
+    with pytest.raises(AttributeError):
+        run.log = None

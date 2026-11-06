@@ -1,0 +1,167 @@
+{
+  "about": "SYNTHETIC DATA. Sample tickets for the interface (block 6): case ID, short title, ticket text and reported time (UTC) only. Copied from cases/scenarios/index.json. No expected results, no human answers and no real company or case names, so the interface never reads the answer key. A test checks this file against the index.",
+  "samples": [
+    {
+      "sample_id": "C01",
+      "title": "Failed platform migration",
+      "ticket": "Since the platform migration on Saturday night (15 Feb, 22:00), customers can't log into online or mobile banking and payments fail. Call centre queues are over an hour.",
+      "reported_at": "2025-02-15T21:00:00Z"
+    },
+    {
+      "sample_id": "C02",
+      "title": "Failed client migration",
+      "ticket": "Clients have been locked out of their accounts since the client migration started on Saturday at 22:00. Online and mobile banking problems, call centres overwhelmed, complaints piling up.",
+      "reported_at": "2025-09-06T20:00:00Z"
+    },
+    {
+      "sample_id": "C03",
+      "title": "Settlement platform outage",
+      "ticket": "Large-value euro payments can't settle since 09:00. The EuroSettle platform is down for all participants, not just us. Cut-offs are being pushed back.",
+      "reported_at": "2026-02-26T08:00:00Z"
+    },
+    {
+      "sample_id": "C04",
+      "title": "Three-day software fault",
+      "ticket": "Since 07:30 the app and online banking are failing for many customers. More than half of online payments fail. It's month-end payday.",
+      "reported_at": "2026-03-30T05:30:00Z"
+    },
+    {
+      "sample_id": "C05",
+      "title": "Card processor hardware fault",
+      "ticket": "Card payments are failing in shops since 14:35, in Germany and abroad. CardNet reports a data centre problem.",
+      "reported_at": "2026-06-01T12:35:00Z"
+    },
+    {
+      "sample_id": "C06",
+      "title": "Ransomware on securities settlement",
+      "ticket": "Securities settlement servers were encrypted overnight, there's a ransom note on screen. We can't settle trades for counterparties.",
+      "reported_at": "2026-05-12T01:10:00Z"
+    },
+    {
+      "sample_id": "C07",
+      "title": "Ransomware at the derivatives vendor",
+      "ticket": "ClearPath says it was hit by ransomware. Our derivatives clearing has been down since 07:00 and staff are processing trades by hand.",
+      "reported_at": "2026-02-02T06:00:00Z"
+    },
+    {
+      "sample_id": "C08",
+      "title": "DDoS attack",
+      "ticket": "Massive traffic flood on our network since 16:30. Online banking is down, ATMs and card payments are having problems.",
+      "reported_at": "2026-04-30T14:30:00Z"
+    },
+    {
+      "sample_id": "C09",
+      "title": "Wrong balances after a software fault",
+      "ticket": "App, online and phone banking failing since 17:00. Some customers can withdraw more than their balance. Queues at ATMs.",
+      "reported_at": "2026-08-18T15:00:00Z"
+    },
+    {
+      "sample_id": "C10",
+      "title": "Cloud data breach found months later",
+      "ticket": "An outside researcher tipped us off: credit application data from our cloud environment is being shared online. Logs show access since March.",
+      "reported_at": "2026-07-21T07:00:00Z"
+    },
+    {
+      "sample_id": "C11",
+      "title": "Breach at the file transfer vendor",
+      "ticket": "SecureDrop, our file transfer vendor, says attackers exploited a flaw in its software and copied files. Our customer files were among them.",
+      "reported_at": "2026-06-05T09:00:00Z"
+    },
+    {
+      "sample_id": "C12",
+      "title": "Ransomware first read as a hardware fault",
+      "ticket": "Core banking systems not working properly since 08:00. Batch jobs are failing, it looks like a storage hardware failure.",
+      "reported_at": "2026-08-26T06:00:00Z"
+    },
+    {
+      "sample_id": "C13",
+      "title": "Breach at a software supplier's file platform",
+      "ticket": "Fintegra warns that an attacker accessed the file transfer platform it uses to send us files. They don't know yet if our files were affected.",
+      "reported_at": "2026-10-07T08:00:00Z"
+    },
+    {
+      "sample_id": "C14",
+      "title": "Outsourcer fault with a payment backlog",
+      "ticket": "SEPA transfers and direct debits stopped at 09:30 because of a fault at Rhein IT Services. Unprocessed payment files are still turning up.",
+      "reported_at": "2026-10-01T07:30:00Z"
+    },
+    {
+      "sample_id": "C15",
+      "title": "Outsourcer fault hits online banking",
+      "ticket": "Online banking has been down since around noon, email too. Rhein IT Services reports a technical fault.",
+      "reported_at": "2026-10-21T10:00:00Z"
+    },
+    {
+      "sample_id": "C16-A",
+      "title": "Planned release, finished on time",
+      "ticket": "The mobile app has been unavailable since Saturday 18:00. Is this the release weekend?",
+      "reported_at": "2026-09-12T16:00:00Z"
+    },
+    {
+      "sample_id": "C16-B",
+      "title": "Planned release that overran",
+      "ticket": "Online banking is still not back on Monday at 08:00. The release window ended at 06:00.",
+      "reported_at": "2026-09-14T06:00:00Z"
+    },
+    {
+      "sample_id": "C17-A",
+      "title": "Faulty security update, office laptops",
+      "ticket": "Office laptops crash with a blue screen after a security software update since 06:10. Online banking and payments are running normally.",
+      "reported_at": "2026-07-16T04:10:00Z"
+    },
+    {
+      "sample_id": "C17-B",
+      "title": "Faulty security update, payment workstations",
+      "ticket": "Payment operations workstations in Duesseldorf and Vienna crash after a security software update since 06:10. Payments are queuing.",
+      "reported_at": "2026-07-16T04:10:00Z"
+    },
+    {
+      "sample_id": "N01",
+      "title": "HR portal slow",
+      "ticket": "HR portal is slow this morning.",
+      "reported_at": "2026-03-10T06:30:00Z"
+    },
+    {
+      "sample_id": "N02",
+      "title": "Short online banking blip",
+      "ticket": "Online banking was unavailable for about 40 minutes from 14:00 this afternoon. A handful of complaints.",
+      "reported_at": "2026-03-17T13:00:00Z"
+    },
+    {
+      "sample_id": "N03",
+      "title": "Payments down 3 hours, nothing else",
+      "ticket": "Outgoing SEPA payments stopped from 10:00 to 13:00, then were processed normally.",
+      "reported_at": "2026-04-14T08:00:00Z"
+    },
+    {
+      "sample_id": "N04",
+      "title": "Phishing click, no access",
+      "ticket": "An employee clicked a phishing link this morning. Security says the login was blocked.",
+      "reported_at": "2026-05-20T09:15:00Z"
+    },
+    {
+      "sample_id": "N05",
+      "title": "Short outage, costly and in the news",
+      "ticket": "Card payments failed for 90 minutes from 12:00 during the Saturday shopping peak. National news covered it. Vendor support and refunds will cost about 140,000 euros.",
+      "reported_at": "2026-06-13T10:00:00Z"
+    },
+    {
+      "sample_id": "N06",
+      "title": "Exactly 10% of clients",
+      "ticket": "Mobile banking login has been failing for part of the app users since 11:00.",
+      "reported_at": "2026-08-04T09:00:00Z"
+    },
+    {
+      "sample_id": "B01",
+      "title": "Brief example: online banking down",
+      "ticket": "Online banking down since 9:10, customers can't log in.",
+      "reported_at": "2026-05-26T07:10:00Z"
+    },
+    {
+      "sample_id": "B03",
+      "title": "Brief example: large data transfer at night",
+      "ticket": "SOC flagged a large data transfer at 2 a.m.",
+      "reported_at": "2026-09-02T00:05:00Z"
+    }
+  ]
+}

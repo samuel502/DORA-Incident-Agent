@@ -135,6 +135,12 @@ class AgentRun:
     def human_desk(self):
         return self._store.human_desk()
 
+    @property
+    def log(self) -> DecisionLog:
+        """This run's decision log, so the notification draft and approval are written to the same log
+        (block 6, option A, approved by Sam). Read-only: the run's log can't be swapped for another one."""
+        return self._log
+
     def start(self) -> RunResult:
         if self._state is not None:
             raise RunProblem("this run has already started")
