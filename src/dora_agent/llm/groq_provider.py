@@ -17,7 +17,7 @@ Rate limits (block 5 step 5, config.toml [llm]):
 
 Access refused (HTTP 401 or 403): the message adds a fixed hint and a one-word tag for the kind of reply
 (json, html or empty). An html reply usually means a network block (VPN, proxy), not Groq's API itself.
-check_access() asks for the model's details before a run: it uses no tokens.
+check_access() lists the models this key may use and checks the configured one is there: no tokens.
 """
 
 from __future__ import annotations
@@ -83,8 +83,17 @@ class GroqProvider:
         return result
 
     def check_access(self) -> None:
-        """Ask Groq for the configured model's details. Uses no tokens. Raises LlmError if access fails."""
-        self._call(lambda: self._client.models.retrieve(self._settings.model))
+        """List the models this key may use and confirm the configured one is there. Uses no tokens.
+
+        models.list, not models.retrieve: a model ID with a slash (openai/gpt-oss-120b) breaks the
+        retrieve URL and gives a false HTTP 404 (live check, 6 Nov 2026). Raises LlmError if access fails.
+        """
+        listing = self._call(lambda: self._client.models.list())
+        ids = {str(getattr(m, "id", "")) for m in (getattr(listing, "data", None) or [])}
+        if self._settings.model not in ids:
+            raise LlmError(f"access works, but the model {self._settings.model!r} is not in the list of models "
+                           "this key may use: check config.toml [llm] model and the model permissions in the "
+                           "Groq console", code="model_not_found")
 
     def _create_with_retries(self, request: dict):
         return self._call(lambda: self._client.chat.completions.create(**request))

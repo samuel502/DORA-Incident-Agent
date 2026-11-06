@@ -302,24 +302,45 @@ def test_wrong_key_gets_the_same_hint():
 
 
 class ModelsClient(StandInClient):
-    def __init__(self, error=None):
-        super().__init__(answer("unused"))
-        self.retrieved = []
+    """Answers models.list with the given IDs, or raises the given error. models.retrieve must not be used."""
 
-        def retrieve(model):
-            self.retrieved.append(model)
+    def __init__(self, ids=("openai/gpt-oss-120b", "llama-3.3-70b-versatile"), error=None):
+        super().__init__(answer("unused"))
+        self.listed = 0
+
+        def list_models():
+            self.listed += 1
             if error:
                 raise error
-            return SimpleNamespace(id=model)
+            return SimpleNamespace(object="list", data=[SimpleNamespace(id=i) for i in ids])
 
-        self.models = SimpleNamespace(retrieve=retrieve)
+        def retrieve(model):
+            raise AssertionError("check_access must not use models.retrieve")
+
+        self.models = SimpleNamespace(list=list_models, retrieve=retrieve)
 
 
-def test_access_check_asks_for_the_model_and_uses_no_tokens():
+def test_access_check_finds_a_model_id_with_a_slash_and_uses_no_tokens():
+    # Live check, 6 Nov 2026: models.retrieve("openai/gpt-oss-120b") gave a false 404 because of the slash.
     client = ModelsClient()
-    GroqProvider(llm_settings(), client=client).check_access()
-    assert client.retrieved == ["openai/gpt-oss-120b"]
+    GroqProvider(llm_settings(), client=client).check_access()  # "openai/gpt-oss-120b" is found: no error
+    assert "/" in llm_settings().model
+    assert client.listed == 1
     assert client.requests == []  # no chat call: no tokens
+
+
+def test_access_check_reports_a_model_not_in_the_list():
+    client = ModelsClient(ids=("llama-3.3-70b-versatile", "openai/gpt-oss-20b"))
+    with pytest.raises(LlmError) as caught:
+        GroqProvider(llm_settings(), client=client).check_access()
+    assert caught.value.code == "model_not_found"
+    assert "openai/gpt-oss-120b" in str(caught.value) and FAKE_KEY not in str(caught.value)
+
+
+def test_access_check_handles_an_empty_list():
+    client = ModelsClient(ids=())
+    with pytest.raises(LlmError, match="not in the list"):
+        GroqProvider(llm_settings(), client=client).check_access()
 
 
 def test_access_check_reports_a_block_plainly():
