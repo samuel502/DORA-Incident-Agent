@@ -16,6 +16,7 @@ from dora_agent.agent.loop import AgentRun, RunProblem
 from dora_agent.config import agent_limits
 from dora_agent.llm.fake_provider import FakeProvider, call, say
 from dora_agent.llm.provider import LlmError, LlmResponse, ToolCall
+from dora_agent.rules import RULE_VERSION
 
 UTC = timezone.utc
 
@@ -321,7 +322,7 @@ def test_log_file_records_every_step_and_the_result(tmp_path):
     assert kinds[0] == "run_started" and kinds[-1] == "result"
     assert {"llm_step", "tool_call", "fact"} <= set(kinds)
     started, result = records[0], records[-1]
-    assert started["rule_version"] == result["rule_version"] == "1.2"
+    assert started["rule_version"] == result["rule_version"] == RULE_VERSION
     assert started["provider"] == "fake"
     assert result["result"] == "major"
     assert result["facts"]["affected_clients"]["source"] == "client_data"

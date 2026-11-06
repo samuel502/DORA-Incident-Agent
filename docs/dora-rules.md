@@ -2,13 +2,15 @@
 
 The single source of truth for the rules engine. Every rule in code must point to a line here and to its article. Nothing gets coded that isn't on this sheet.
 
-Rule version: 1.2 (5 November 2026)
+Rule version: 1.3 (6 November 2026)
+
+Changes in 1.3: section 5 completed with RTS-R Art. 5(2) to 5(6) (late classification, missed deadlines, weekends and bank holidays, and who the weekend rule does not apply to). Section 10 added: the content of the initial notification, from RTS-R Art. 1 and 2 and the template fields in ITS-R Annex II. ITS-R added to the sources. No classification threshold or criterion changed.
 
 Changes in 1.2: open question 8 added (when the downtime and duration of a planned window that overran start), open question 5 extended (what happens when nobody has answered "planned?"), and open question 9 added (T5-b checked on its own, without the "not covered by T5-a" exclusion). All three are interpretations. No threshold or criterion changed.
 
 Changes in 1.1: open questions 4, 5 and 6 added to section 8 (found while mapping `case-library.md`), the daily average method added to open question 6, and the client totals method added as open question 7. No threshold, criterion or rule logic changed.
 
-Verified: Sam checked the spot-check list in section 9 against the official EUR-Lex text on 4 November 2026. All five match.
+Verified: Sam checked the spot-check list in section 9 against the official EUR-Lex text on 4 November 2026 (items 1 to 5) and 6 November 2026 (items 6 to 10). All ten match.
 
 ## Sources
 
@@ -16,9 +18,10 @@ Verified: Sam checked the spot-check list in section 9 against the official EUR-
 |---|---|---|
 | DORA | Regulation (EU) 2022/2554 | The law itself. Art. 18 (classification), Art. 19 (reporting) |
 | RTS-C | Commission Delegated Regulation (EU) 2024/1772 | Classification criteria (Art. 1 to 7), when an incident is major (Art. 8), thresholds (Art. 9) |
-| RTS-R | Commission Delegated Regulation (EU) 2025/301 | Reporting deadlines (Art. 5) |
+| RTS-R | Commission Delegated Regulation (EU) 2025/301 | Content of the initial notification (Art. 1, 2), reporting deadlines (Art. 5) |
+| ITS-R | Commission Implementing Regulation (EU) 2025/302 | Template (Annex I) and data glossary with field numbers (Annex II) |
 
-Official texts: EUR-Lex. RTS-C was read from the Official Journal version (OJ L, 25.6.2024).
+Official texts: EUR-Lex. RTS-C was read from the Official Journal version (OJ L, 25.6.2024). RTS-R and ITS-R were read from the Official Journal versions (OJ L, 20.2.2025, both adopted 23 October 2024).
 
 ## 1. The big rule: when is an incident major?
 
@@ -163,7 +166,18 @@ Banks must check for recurring incidents monthly. This does not apply to microen
 | Intermediate report | Within **72 hours** of the initial notification |
 | Final report | No later than **one month** after the latest intermediate report |
 
-Extra rules in RTS-R Art. 5: if a deadline falls on a weekend or bank holiday, special rules apply (submission by noon of the next working day in some cases). If a bank can't meet a deadline, it must tell the authority and explain why.
+Extra rules in RTS-R Art. 5:
+
+- **Art. 5(1)(a):** the initial notification is due "as early as possible", within 4 hours of classification as major, and no later than 24 hours after the bank became aware of the incident.
+- **Art. 5(2), late classification:** if the bank classifies the incident as major only after those 24 hours, the initial notification is due within 4 hours of that classification.
+- **Art. 5(3), missed deadline:** if the bank can't meet a deadline, it tells the authority without undue delay, and no later than the deadline, and explains why.
+- **Art. 5(4), weekends and bank holidays:** if a deadline falls on a weekend day or a bank holiday in the bank's Member State, the report may be submitted by noon of the next working day.
+- **Art. 5(5):** Art. 5(4) does **not** apply to the initial notifications and intermediate reports of credit institutions, central counterparties, trading venue operators, and entities that are essential or important under Art. 3 of Directive (EU) 2022/2555.
+- **Art. 5(6):** the authority may also switch off Art. 5(4) for other significant or systemic entities.
+
+Rheinbank is a credit institution (open question 3). So under Art. 5(5), the weekend and bank holiday extension does not apply to its initial notification: the 4 and 24 hour deadline holds on weekends and bank holidays too. The tool says so next to the deadline. For any other kind of entity, the tool does not apply Art. 5(4) and says so.
+
+ITS-R Annex II, field 2.2: the "date and time of detection" is when the bank became aware of the incident. So in this project, "aware" and "detected" are the same moment.
 
 **Status in this project:** the tool shows the initial notification deadline only. Intermediate and final reports are out of scope.
 
@@ -224,3 +238,55 @@ Check these five lines against EUR-Lex (search "2024/1772 EUR-Lex", German versi
 3. Art. 9(3): 24 hours duration, 2 hours downtime
 4. Art. 9(6): €100,000
 5. Art. 6(c): malicious unauthorised access counts as critical services affected
+
+Added in 1.3. Check against EUR-Lex (search "2025/301 EUR-Lex" or "2025/302 EUR-Lex", Official Journal version of 20.2.2025). In 2025/302 the fields are in Annex II, in the table with the column "Mandatory for initial notification":
+
+6. **Deadline.** RTS-R (2025/301) Art. 5(1)(a) and 5(2). 5(1)(a): initial notification within 4 hours of classification as major, and no later than 24 hours after becoming aware. 5(2): if classified as major only after those 24 hours, within 4 hours of that classification.
+7. **No weekend extension for banks.** RTS-R (2025/301) Art. 5(4) and 5(5). 5(4): a deadline on a weekend day or bank holiday moves to noon of the next working day. 5(5): 5(4) does not apply to initial notifications and intermediate reports of credit institutions (and others).
+8. **Field 2.2, detection time.** ITS-R (2025/302) Annex II, field 2.2, based on RTS-R Art. 2(b). Mandatory. The moment the bank became aware of the incident, ISO 8601, UTC.
+9. **Field 2.5, classification criteria.** ITS-R (2025/302) Annex II, field 2.5, based on RTS-R Art. 2(d). Mandatory, multiple choice of 7: clients, financial counterparts and transactions affected; reputational impact; duration and service downtime; geographical spread; data losses; critical services affected; economic impact.
+10. **Field 2.7, discovery.** ITS-R (2025/302) Annex II, field 2.7, based on RTS-R Art. 2(f). Mandatory, one choice of 11: IT security; staff; internal audit; external audit; clients; financial counterparts; third-party provider; attacker; monitoring systems; authority/agency/law enforcement body; other.
+
+## 10. Content of the initial notification
+
+**RTS-R Art. 1 and 2, ITS-R Art. 1 and Annex II.** Field numbers are from ITS-R Annex II. "Mandatory" means the "mandatory for initial notification" column of Annex II.
+
+General rules:
+
+- ITS-R Art. 1(1)(a): for the initial notification, fill in the fields that RTS-R Art. 2 requires. Fields needed only for later reports may be filled in if already known.
+- ITS-R Art. 1(2): the information must be complete and accurate.
+- ITS-R Art. 1(3): estimates are allowed where accurate data isn't available.
+- ITS-R Art. 4: reports go through the secure channel the competent authority provides. (This tool never sends anything. See the build contract.)
+- RTS-R recital 2: the initial notification should be limited to the most significant information.
+
+### Section 1: general information (RTS-R Art. 1)
+
+| Field | Name | Initial notification | Notes |
+|---|---|---|---|
+| 1.1 | Type of submission | Mandatory | Choice: initial notification, intermediate report, final report, major incident reclassified as non-major (RTS-R Art. 1(a)) |
+| 1.2 | Name of the entity submitting the report | Mandatory | Full legal name (RTS-R Art. 1(c)) |
+| 1.3 | Identification code of the entity submitting the report | Mandatory | LEI, 20 characters, ISO 17442-1:2020 |
+| 1.4 | Type of the affected financial entity | Mandatory | Choice of the DORA Art. 2(1) types, for example "credit institution" (RTS-R Art. 1(b)) |
+| 1.5 | Name of the financial entity affected | Conditional | Only if it differs from the submitter, or for aggregated reports (RTS-R Art. 1(b), (d)) |
+| 1.6 | LEI code of the financial entity affected | Conditional | Same condition as 1.5 |
+| 1.7 to 1.9 | Primary contact: name, email, telephone | Mandatory | Telephone with international prefix (RTS-R Art. 1(e)) |
+| 1.10 to 1.12 | Second contact: name, email, telephone | Mandatory | May be a team or a functional mailbox |
+| 1.13, 1.14 | Ultimate parent undertaking: name, LEI | Conditional | Only if the bank is part of a group (RTS-R Art. 1(f)) |
+| 1.15 | Reporting currency | Mandatory | ISO 4217 code (RTS-R Art. 1(g)) |
+
+### Section 2: content of the initial notification (RTS-R Art. 2)
+
+| Field | Name | Initial notification | RTS-R Art. 2 | Notes |
+|---|---|---|---|---|
+| 2.1 | Incident reference code assigned by the financial entity | Mandatory | (a) | The bank's own unique code |
+| 2.2 | Date and time of detection | Mandatory | (b) | When the bank became aware. ISO 8601, UTC |
+| 2.3 | Date and time of classification as major | Mandatory | (b) | Classification under RTS-C. ISO 8601, UTC |
+| 2.4 | Description of the incident | Mandatory | (c) | High-level overview: possible causes, immediate impacts, systems affected, known or expected impact on third-party providers or other financial entities |
+| 2.5 | Classification criteria that triggered the report | Mandatory | (d) | Multiple choice: clients, financial counterparts and transactions affected; reputational impact; duration and service downtime; geographical spread; data losses; critical services affected; economic impact |
+| 2.6 | EEA Member States impacted (geographical spread) | Conditional | (e) | Only if the geographical spread threshold (T4) is met. ISO 3166 alpha-2 codes |
+| 2.7 | Discovery of the incident | Mandatory | (f) | Choice: IT security, staff, internal audit, external audit, clients, financial counterparts, third-party provider, attacker, monitoring systems, authority/agency/law enforcement body, other |
+| 2.8 | Origin in a third-party provider or another financial entity | Conditional | (g) | Only if it originates there. Name and identification code (for example LEI) |
+| 2.9 | Activation of business continuity plan | Mandatory | (h) | Yes or no |
+| 2.10 | Other relevant information | Conditional | (i), (j) | If there is other relevant information, or if the incident was reclassified as non-major (then the reasons) |
+
+**Status in this project:** field 1.1 is always "initial notification". Reclassification and aggregated reports are out of scope.
