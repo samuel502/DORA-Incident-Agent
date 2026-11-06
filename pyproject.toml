@@ -12,3 +12,4 @@ dependencies = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
+markers = ["live: calls the real Groq API; opt-in with RUN_LIVE_TESTS=1 and GROQ_API_KEY (tests/live/)"]

@@ -106,6 +106,11 @@ QUESTIONS: dict[str, Question] = {
         Question(fact_name="affected_clients",
                  text="How many clients were affected? An estimate from comparable periods is fine.",
                  basis="Section 3, T1, RTS-C Art. 1(5)", allows_estimate=True),
+        # Block 5 step 5: needed to rule out T1-c when client data has no counterpart count (cases N03, N06).
+        Question(fact_name="affected_counterparts",
+                 text="How many financial counterparts with a contract with Rheinbank were affected? "
+                      "Answer 0 if none. An estimate from comparable periods is fine.",
+                 basis="Section 3, T1-c, RTS-C Art. 9(1)(c), Art. 1(2), Art. 1(5)", allows_estimate=True),
         Question(fact_name="resolved_at",
                  text="When was the incident resolved, or when do you expect it to be? "
                       "Give date, time and time zone. An estimate is fine.",

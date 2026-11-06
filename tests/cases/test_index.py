@@ -11,11 +11,12 @@ import json
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 from pydantic import AwareDatetime, BaseModel, ConfigDict
 
+from dora_agent.agent.questions import QUESTIONS, interpret_answer
 from dora_agent.config import DATA_DIR, PROJECT_ROOT
 from dora_agent.connectors import (
     _store,
@@ -50,6 +51,7 @@ class Scenario(BaseModel):
     expected_result: Result
     why: str
     data_sources: tuple[Source, ...]
+    human_answers: dict[str, Any]  # block 5: the scripted human's answers to fixed questions
 
 
 RAW = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
@@ -146,6 +148,22 @@ def test_index_is_out_of_the_agents_reach():
     for path in CONNECTORS_DIR.glob("*.py"):
         source = path.read_text(encoding="utf-8")
         assert "index.json" not in source and "cases" not in source, path.name
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.scenario_id)
+def test_human_answers_fit_the_fixed_questions(scenario):
+    # Block 5: every scripted answer is a valid answer to one fixed question (questions.py).
+    for name, entry in scenario.human_answers.items():
+        question = QUESTIONS[name]  # KeyError: no fixed question for this fact
+        if isinstance(entry, dict):
+            assert set(entry) == {"answer", "estimate"}, name
+            assert question.meaning is None, f"{name}: yes/no answers are plain text"
+            assert not entry["estimate"] or question.allows_estimate, name
+            answer = entry["answer"]
+        else:
+            assert question.meaning is not None and entry in ("yes", "no"), name  # never "unsure" in the key
+            answer = entry
+        assert interpret_answer(name, answer) is not None, name
 
 
 # ---------- 3. against the bank data ----------

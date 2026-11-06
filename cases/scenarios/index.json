@@ -1,5 +1,5 @@
 {
-  "about": "TEST INDEX (answer key). Maps every case in docs/case-library.md to its ticket text, Rheinbank service, time (UTC) and expected result. Used by tests only: the agent must never read this file. Real case names appear here and nowhere in data/rheinbank/. Scripted human answers are added in block 5.",
+  "about": "TEST INDEX (answer key). Maps every case in docs/case-library.md to its ticket text, Rheinbank service, time (UTC) and expected result. Used by tests only: the agent must never read this file. Real case names appear here and nowhere in data/rheinbank/. human_answers is the scripted human (block 5): the answer to each fixed question, copied from the block 4 hand-checked facts. A question not listed is answered 'unsure' (yes/no) or left unanswered (numbers).",
   "case_library": "docs/case-library.md, batch 1",
   "scenarios": [
     {
@@ -16,7 +16,15 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes",
+        "repeated_complaints": "yes",
+        "costs_eur": {
+          "answer": 1000000,
+          "estimate": true
+        }
+      }
     },
     {
       "scenario_id": "C02",
@@ -32,7 +40,11 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes",
+        "repeated_complaints": "yes"
+      }
     },
     {
       "scenario_id": "C03",
@@ -49,7 +61,14 @@
         "monitoring",
         "client_impact",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "data_availability_impact": "no",
+        "data_authenticity_impact": "no",
+        "data_integrity_impact": "no",
+        "data_confidentiality_impact": "no",
+        "malicious_access": "no"
+      }
     },
     {
       "scenario_id": "C04",
@@ -65,7 +84,14 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes",
+        "costs_eur": {
+          "answer": 5000000,
+          "estimate": true
+        }
+      }
     },
     {
       "scenario_id": "C05",
@@ -82,7 +108,14 @@
         "monitoring",
         "client_impact",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes",
+        "data_availability_impact": "no",
+        "data_authenticity_impact": "no",
+        "data_integrity_impact": "no",
+        "data_confidentiality_impact": "no"
+      }
     },
     {
       "scenario_id": "C06",
@@ -99,7 +132,12 @@
         "monitoring",
         "client_impact",
         "security_alerts"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "yes",
+        "access_on_own_systems": "yes",
+        "access_may_cause_data_loss": "no"
+      }
     },
     {
       "scenario_id": "C07",
@@ -117,7 +155,12 @@
         "client_impact",
         "security_alerts",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "yes",
+        "access_on_own_systems": "no",
+        "media_coverage": "yes"
+      }
     },
     {
       "scenario_id": "C08",
@@ -134,7 +177,11 @@
         "monitoring",
         "client_impact",
         "security_alerts"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no",
+        "media_coverage": "yes"
+      }
     },
     {
       "scenario_id": "C09",
@@ -150,7 +197,11 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes",
+        "regulatory_requirements_impact": "yes"
+      }
     },
     {
       "scenario_id": "C10",
@@ -166,7 +217,12 @@
       "data_sources": [
         "client_impact",
         "security_alerts"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "yes",
+        "access_on_own_systems": "yes",
+        "access_may_cause_data_loss": "no"
+      }
     },
     {
       "scenario_id": "C11",
@@ -183,7 +239,12 @@
         "client_impact",
         "security_alerts",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "yes",
+        "access_on_own_systems": "no",
+        "media_coverage": "yes"
+      }
     },
     {
       "scenario_id": "C12",
@@ -199,7 +260,12 @@
       "data_sources": [
         "monitoring",
         "security_alerts"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "yes",
+        "access_on_own_systems": "yes",
+        "access_may_cause_data_loss": "no"
+      }
     },
     {
       "scenario_id": "C13",
@@ -216,7 +282,11 @@
         "client_impact",
         "security_alerts",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "yes",
+        "access_on_own_systems": "no"
+      }
     },
     {
       "scenario_id": "C14",
@@ -233,7 +303,11 @@
         "monitoring",
         "client_impact",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes",
+        "repeated_complaints": "yes"
+      }
     },
     {
       "scenario_id": "C15",
@@ -250,7 +324,10 @@
         "monitoring",
         "client_impact",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "media_coverage": "yes"
+      }
     },
     {
       "scenario_id": "C16-A",
@@ -265,7 +342,10 @@
       "why": "Planned and announced, back inside the window",
       "data_sources": [
         "monitoring"
-      ]
+      ],
+      "human_answers": {
+        "planned_and_announced": "yes"
+      }
     },
     {
       "scenario_id": "C16-B",
@@ -280,7 +360,10 @@
       "why": "The overrun beyond the planned window is an incident",
       "data_sources": [
         "monitoring"
-      ]
+      ],
+      "human_answers": {
+        "planned_and_announced": "yes"
+      }
     },
     {
       "scenario_id": "C17-A",
@@ -297,7 +380,10 @@
         "monitoring",
         "security_alerts",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no"
+      }
     },
     {
       "scenario_id": "C17-B",
@@ -315,7 +401,10 @@
         "client_impact",
         "security_alerts",
         "supplier_notices"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no"
+      }
     },
     {
       "scenario_id": "N01",
@@ -330,7 +419,10 @@
       "why": "Gate fails",
       "data_sources": [
         "monitoring"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no"
+      }
     },
     {
       "scenario_id": "N02",
@@ -347,7 +439,27 @@
         "monitoring",
         "client_impact",
         "security_alerts"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no",
+        "media_coverage": "no",
+        "repeated_complaints": "no",
+        "regulatory_requirements_impact": "no",
+        "client_loss_impact": "no",
+        "data_availability_impact": "no",
+        "data_authenticity_impact": "no",
+        "data_integrity_impact": "no",
+        "data_confidentiality_impact": "no",
+        "relevant_parties_affected": "no",
+        "affected_counterparts": {
+          "answer": 0,
+          "estimate": false
+        },
+        "costs_eur": {
+          "answer": 5000,
+          "estimate": false
+        }
+      }
     },
     {
       "scenario_id": "N03",
@@ -363,7 +475,27 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no",
+        "media_coverage": "no",
+        "repeated_complaints": "no",
+        "regulatory_requirements_impact": "no",
+        "client_loss_impact": "no",
+        "data_availability_impact": "no",
+        "data_authenticity_impact": "no",
+        "data_integrity_impact": "no",
+        "data_confidentiality_impact": "no",
+        "relevant_parties_affected": "no",
+        "affected_counterparts": {
+          "answer": 0,
+          "estimate": false
+        },
+        "costs_eur": {
+          "answer": 20000,
+          "estimate": false
+        }
+      }
     },
     {
       "scenario_id": "N04",
@@ -378,7 +510,10 @@
       "why": "No successful access",
       "data_sources": [
         "security_alerts"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no"
+      }
     },
     {
       "scenario_id": "N05",
@@ -394,7 +529,15 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no",
+        "media_coverage": "yes",
+        "costs_eur": {
+          "answer": 140000,
+          "estimate": true
+        }
+      }
     },
     {
       "scenario_id": "N06",
@@ -410,7 +553,23 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {
+        "malicious_access": "no",
+        "media_coverage": "no",
+        "repeated_complaints": "no",
+        "regulatory_requirements_impact": "no",
+        "client_loss_impact": "no",
+        "data_availability_impact": "no",
+        "data_authenticity_impact": "no",
+        "data_integrity_impact": "no",
+        "data_confidentiality_impact": "no",
+        "relevant_parties_affected": "no",
+        "affected_counterparts": {
+          "answer": 0,
+          "estimate": false
+        }
+      }
     },
     {
       "scenario_id": "B01",
@@ -426,7 +585,8 @@
       "data_sources": [
         "monitoring",
         "client_impact"
-      ]
+      ],
+      "human_answers": {}
     },
     {
       "scenario_id": "B03",
@@ -441,7 +601,8 @@
       "why": "Major only if a human confirms successful malicious access",
       "data_sources": [
         "security_alerts"
-      ]
+      ],
+      "human_answers": {}
     }
   ]
 }
