@@ -56,7 +56,7 @@ Done in step 1 (option A): `AgentRun.log`, read-only. The page passes it to `pre
 
 ## 9. Hard total time limit per run (new, 8 November 2026)
 
-- New setting in `config.toml` `[agent]`: `max_run_seconds`. Proposed value: 600 (10 minutes). The slowest measured live run took 7 min 13 s (B03, 6 November 2026), mostly pacing waits for the Groq free tier.
+- New setting in `config.toml` `[agent]`: `max_run_seconds` = 600 (10 minutes). Value and the `loop.py` change approved by Sam on 8 November 2026. The slowest measured live run took 7 min 13 s (B03, 6 November 2026), mostly pacing waits for the Groq free tier.
 - The clock counts the agent's working time across all rounds. Time spent waiting for a person to answer does not count.
 - The loop checks the clock before every LLM call and every tool call. Each LLM call, and its waits for rate limits, is cut short to the time left, so the limit is hard, not "finish the current call first".
 - When time runs out, the run stops with stop reason `time_limit`. The rules engine gives its result on the facts so far, and the missing facts are listed, as with the other limits.
