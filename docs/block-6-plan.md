@@ -93,7 +93,8 @@ Tests (no Colab needed, with a stand-in for Gradio and `google.colab`): the laun
 | File | What it does |
 |---|---|
 | `src/dora_agent/ui/views.py` | Turns run results, the trace and drafts into plain text and tables. No Gradio, so it's easy to test |
-| `src/dora_agent/ui/app.py` | The Gradio page and its buttons |
+| `src/dora_agent/ui/controller.py` | What each button does, in plain Python. No Gradio, so it's easy to test (added in step 4) |
+| `src/dora_agent/ui/app.py` | The Gradio page: layout and wiring only |
 | `src/dora_agent/ui/launch.py` | The Colab launch with the settings in section 10 |
 | `src/dora_agent/agent/loop.py`, LLM call path, `config.toml` | The total time limit (section 9) |
 | `cases/samples.json` | Sample tickets only, no answers (done in step 1) |
@@ -110,6 +111,6 @@ Tests (no Colab needed, with a stand-in for Gradio and `google.colab`): the laun
 5. The launch function and the notebook's launch cell. Sam runs it in Colab.
 6. Sam tests it by hand, then the security review.
 
-## Open question for step 4
+## Decided for step 4
 
-When a sample is replayed, which time should the rules engine measure at? My recommendation: "now", so every sample incident is measured in full, as in the hand-checked case tests. The alternative, the reported time, makes many results "undetermined".
+Replayed samples are measured at "now" (the time of the run), so every sample incident is measured in full, as in the hand-checked case tests. Pasted tickets are measured at "now" too. Decided by Sam on 8 November 2026.
