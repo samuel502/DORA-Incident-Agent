@@ -54,3 +54,22 @@ def test_expected_answer_size_counts_too():
 
 def test_estimate_is_about_four_characters_per_token():
     assert 240 <= estimate_tokens("x" * 1000) <= 260
+
+
+# ---------- block 6 step 3: the run's time limit ----------
+
+
+def test_wait_that_would_pass_the_deadline_is_not_started():
+    t = FakeTime()
+    pacer = TokenPacer(1000, clock=t.clock, sleep=t.sleep)
+    pacer.record(900, 0)
+    assert pacer.wait_for(500, deadline=t.now + 30) is False  # it would need about 60 s
+    assert t.slept == []
+
+
+def test_wait_that_fits_before_the_deadline_goes_ahead():
+    t = FakeTime()
+    pacer = TokenPacer(1000, clock=t.clock, sleep=t.sleep)
+    pacer.record(900, 0)
+    assert pacer.wait_for(500, deadline=t.now + 120) is True
+    assert len(t.slept) == 1 and t.slept[0] <= 61

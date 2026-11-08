@@ -106,6 +106,11 @@ class AgentLimits:
     gate_check_alert_days_before: int
     gate_check_alert_days_after: int
     max_repeated_calls: int
+    max_run_seconds: int  # hard total working time per run (block 6 step 3)
+
+
+# Upper bound for max_run_seconds, so a typo can't switch the time limit off in practice.
+MAX_RUN_SECONDS_CAP = 3600
 
 
 @lru_cache(maxsize=1)
@@ -121,6 +126,8 @@ def agent_limits() -> AgentLimits:
         values[field.name] = value
     if values["gate_check_alert_days_before"] + values["gate_check_alert_days_after"] > 31:
         raise ValueError("config.toml [agent] gate check alert window must be at most 31 days (connector limit)")
+    if values["max_run_seconds"] > MAX_RUN_SECONDS_CAP:
+        raise ValueError(f"config.toml [agent] max_run_seconds must be at most {MAX_RUN_SECONDS_CAP}")
     return AgentLimits(**values)
 
 

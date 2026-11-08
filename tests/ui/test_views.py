@@ -310,3 +310,9 @@ def test_trace_numbers_run_without_gaps_after_a_round_of_questions():
     run, result = run_to_end("C02")
     assert result.human_rounds >= 1
     assert [r["seq"] for r in result.trace] == list(range(1, len(result.trace) + 1))
+
+
+def test_result_shows_the_working_time(major_run):
+    _, result = major_run
+    assert f"{result.seconds_used:.0f} s of working time (time spent waiting for you not counted)" in \
+        views.result_text(result)

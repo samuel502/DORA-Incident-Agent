@@ -192,7 +192,7 @@ def test_llm_error_falls_back_to_code():
     class Broken:
         name = "broken"
 
-        def chat(self, messages, tools):
+        def chat(self, messages, tools, time_left=None):
             raise LlmError("down", code="timeout")
 
     result = describe_incident(major(), Broken(), settings=SETTINGS)

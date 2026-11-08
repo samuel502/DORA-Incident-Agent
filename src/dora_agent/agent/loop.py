@@ -4,8 +4,15 @@ Who does what (CLAUDE.md hard rules 1, 4, 8, 9):
 - The LLM proposes tool calls. Plain code checks and runs them (tools.py).
 - The result is ALWAYS worked out by plain code at the end: classify() on the stored facts.
   Whatever the LLM writes in its text is logged and never used as the result.
-- Hard limits from config.toml [agent]: steps, tool calls (per run and per step), human rounds.
+- Hard limits from config.toml [agent]: steps, tool calls (per run and per step), human rounds,
+  and a total time limit (max_run_seconds).
 - Every step goes to the decision log (audit/log.py).
+
+Time limit (block 6 step 3, approved by Sam): the run's clock counts the agent's own working time, from
+start() or resume() until the run pauses or ends. Time spent waiting for a person does not count.
+The clock is checked before every LLM call and every tool call, and each LLM call gets the time left
+(`time_left`), so the provider doesn't wait or keep a request open past it. When time runs out, the run
+stops with stop reason "time_limit" and the rules engine gives its result on the facts so far.
 
 Gate check (Sam, block 5 step 3): if the gate depends only on G-c (service not critical, not regulated),
 plain code checks the security alerts (if the LLM has not), and if no successful access is confirmed,
@@ -30,7 +37,9 @@ answers through `resume()`. The LLM never sees the human desk.
 from __future__ import annotations
 
 import hashlib
+import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -44,7 +53,7 @@ from dora_agent.agent.questions import AnswerProblem, QUESTIONS, interpret_answe
 from dora_agent.agent.tools import WHERE_TO_FIND, RunContext, Toolbox, check_first
 from dora_agent.audit import DecisionLog
 from dora_agent.config import AgentLimits, agent_limits, llm_settings
-from dora_agent.llm.provider import LlmError, LlmProvider, Message, ToolCall
+from dora_agent.llm.provider import TIME_LIMIT, LlmError, LlmProvider, Message, ToolCall
 from dora_agent.rules import RULE_VERSION, Classification, classify
 from dora_agent.rules.thresholds import NOT_MET, UNKNOWN
 
@@ -52,7 +61,7 @@ FINAL = {"major", "not_major", "not_an_incident"}
 
 Status = Literal["finished", "needs_human", "stopped"]
 StopReason = Literal["final_result", "needs_human", "llm_finished", "step_limit", "tool_call_limit",
-                     "human_round_limit", "llm_error", "repeat_limit", "no_more_sources"]
+                     "human_round_limit", "llm_error", "repeat_limit", "no_more_sources", "time_limit"]
 
 # Tools through which only a human can supply a fact: a fixed question, or a ticket suggestion a human confirms.
 HUMAN_TOOLS = frozenset({"ask_human", "suggest_facts"})
@@ -90,14 +99,20 @@ class RunResult(BaseModel):
     steps_used: int = 0
     tool_calls_used: int = 0
     human_rounds: int = 0
+    seconds_used: float = 0.0  # the agent's own working time so far, not counting time waiting for a person
     trace: tuple[dict, ...] = ()
 
 
 class AgentRun:
     def __init__(self, ticket: str, reported_at: datetime, provider: LlmProvider, *,
                  as_of: datetime | None = None, limits: AgentLimits | None = None,
-                 log_dir: Path | None = None, run_id: str | None = None):
+                 log_dir: Path | None = None, run_id: str | None = None,
+                 clock: Callable[[], float] = time.monotonic):
+        """clock: only for tests, to pass a stand-in for the time limit's clock."""
         self._limits = limits or agent_limits()
+        self._clock = clock
+        self._worked = 0.0  # working seconds of the segments that have ended
+        self._segment_start: float | None = None  # set while the agent works (start or resume until it returns)
         if not isinstance(ticket, str) or not ticket.strip():
             raise RunProblem("the ticket is empty")
         if len(ticket) > self._limits.max_ticket_chars:
@@ -145,6 +160,7 @@ class AgentRun:
         if self._state is not None:
             raise RunProblem("this run has already started")
         self._state = "stopped"
+        self._segment_start = self._clock()  # the run's clock starts
         return self._loop()
 
     def resume(self, *, confirmed_by: str, answers: dict[str, Any] | None = None,
@@ -174,6 +190,7 @@ class AgentRun:
                 desk.answer(name, answer, confirmed_by=confirmed_by, is_estimate=name in estimates)
         except StoreProblem as problem:
             raise RunProblem(str(problem)) from None
+        self._segment_start = self._clock()  # the run's clock goes on: the person has answered
         self._human_rounds += 1
         self._log.write("human_input", by=confirmed_by, answers=answers, estimates=sorted(estimates),
                         review=[d.model_dump() for d in review or []],
@@ -196,15 +213,28 @@ class AgentRun:
 
     # ---------- the loop ----------
 
+    def _seconds_used(self) -> float:
+        running = self._clock() - self._segment_start if self._segment_start is not None else 0.0
+        return self._worked + running
+
+    def _time_left(self) -> float:
+        """Seconds of working time this run has left (config.toml [agent] max_run_seconds)."""
+        return self._limits.max_run_seconds - self._seconds_used()
+
     def _loop(self) -> RunResult:
         limits = self._limits
         while True:
             if self._steps >= limits.max_steps:
                 return self._end("stopped", "step_limit")
+            time_left = self._time_left()
+            if time_left <= 0:
+                return self._end("stopped", "time_limit")
             try:
-                response = self._provider.chat(self._messages, self._toolbox.specs())
+                response = self._provider.chat(self._messages, self._toolbox.specs(), time_left=time_left)
             except LlmError as error:
                 self._log.write("llm_error", error=str(error), code=error.code, status=error.status)
+                if error.code == TIME_LIMIT:
+                    return self._end("stopped", "time_limit")
                 if error.code == "tool_use_failed" and not self._repairing:
                     # The provider refused an unreadable tool call. Say so once and let the LLM try again.
                     # The failed call counts as a step, so the step limit still applies (hard rule 8).
@@ -224,8 +254,12 @@ class AgentRun:
             if not response.tool_calls:
                 return self._settle()  # the LLM thinks it is done
 
-            limit_hit = False
+            limit_hit = time_hit = False
             for index, call in enumerate(response.tool_calls):
+                if time_hit or self._time_left() <= 0:
+                    time_hit = True
+                    self._reply(call, {"error": "not run: time limit for this run reached"})
+                    continue
                 if self._tool_calls >= limits.max_tool_calls:
                     limit_hit = True
                     self._reply(call, {"error": "not run: tool call limit for this run reached"})
@@ -234,6 +268,8 @@ class AgentRun:
                     self._reply(call, {"error": "not run: too many tool calls in one step"})
                     continue
                 self._run_tool(call, by="llm")
+            if time_hit:
+                return self._end("stopped", "time_limit")
             if limit_hit:
                 return self._end("stopped", "tool_call_limit")
             # The rules engine after every step, in code: a final result ends the run at once.
@@ -280,6 +316,8 @@ class AgentRun:
         current = current or self._rules_check()
         if current.result in FINAL:
             return self._end("finished", "final_result")
+        if self._time_left() <= 0:  # the gate check may run a tool: not past the time limit
+            return self._end("stopped", "time_limit")
         blocked = self._gate_check(current)
         if not self._context.pending_questions and self._human_only(current) == "done":
             blocked = True
@@ -361,6 +399,9 @@ class AgentRun:
         # The result is ALWAYS the rules engine's, on the facts held right now (hard rule 1).
         classification = classify(self._store.snapshot(), self._context.as_of)
         self._state = status
+        # The run's clock stops here: a pause waits for a person, and that time does not count.
+        self._worked = self._seconds_used()
+        self._segment_start = None
         conflicts = tuple(self._store.conflicts())
         questions = tuple(_pending(name) for name in self._context.pending_questions) if status == "needs_human" else ()
         review = tuple(self._store.review_items()) if status == "needs_human" else ()
@@ -375,6 +416,8 @@ class AgentRun:
             "repeat_limit": f"Stopped asking the LLM: it kept repeating the same lookups. {classification.summary}",
             "no_more_sources": ("Nothing more can be found: what is still missing can only come from a human, "
                                 f"and it was already asked. {classification.summary}"),
+            "time_limit": (f"Stopped: the time limit of {self._limits.max_run_seconds} seconds for this run was "
+                           f"reached. {classification.summary}"),
         }[reason]
         if conflicts:
             message += f" {len(conflicts)} conflict(s) between a system and a human answer: please check."
@@ -387,12 +430,13 @@ class AgentRun:
             questions=[q.fact_name for q in questions], review=[r.fact_name for r in review],
             facts=classification.facts.model_dump(mode="json"), rule_version=classification.rule_version,
             steps=self._steps, tool_calls=self._tool_calls, tool_path=self._tool_path,
+            seconds_used=round(self._worked, 1),
         )
         return RunResult(
             run_id=self.run_id, status=status, stop_reason=reason, message=message,
             classification=classification, questions=questions, review_items=review, conflicts=conflicts,
             tool_path=tuple(self._tool_path), steps_used=self._steps, tool_calls_used=self._tool_calls,
-            human_rounds=self._human_rounds, trace=tuple(self._log.records),
+            human_rounds=self._human_rounds, seconds_used=round(self._worked, 1), trace=tuple(self._log.records),
         )
 
 

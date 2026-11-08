@@ -195,7 +195,7 @@ def test_a_run_that_ended_on_an_llm_error_never_counts_as_matched():
     class RateLimited:
         name = "fake"
 
-        def chat(self, messages, tools):
+        def chat(self, messages, tools, time_left=None):
             raise LlmError("LLM call refused: RateLimitError (HTTP 429, rate_limit_exceeded)",
                            code="rate_limit_exceeded")
 
@@ -225,7 +225,7 @@ def test_refused_access_stops_the_remaining_cases():
     class Refused:
         name = "fake"
 
-        def chat(self, messages, tools):
+        def chat(self, messages, tools, time_left=None):
             raise LlmError("LLM call refused: PermissionDeniedError (HTTP 403); access refused", status=403)
 
     outcomes = run_cases(SCENARIOS[:4], lambda s: Refused())

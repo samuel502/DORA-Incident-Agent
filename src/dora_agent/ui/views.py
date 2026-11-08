@@ -139,7 +139,8 @@ def result_text(result: RunResult) -> str:
         lines += ["", "Conflicts between a system and a person's answer (the person's answer is used):"]
         lines += [f"- {one_line(x.describe())}" for x in result.conflicts]
     lines += ["", f"Run {result.run_id}: {result.steps_used} AI step(s), {result.tool_calls_used} tool call(s), "
-              f"{result.human_rounds} round(s) of questions. Stop reason: {result.stop_reason}. "
+              f"{result.human_rounds} round(s) of questions, {result.seconds_used:.0f} s of working time "
+              f"(time spent waiting for you not counted). Stop reason: {result.stop_reason}. "
               f"Rule version {c.rule_version}, measured at {format_time(c.as_of)}."]
     return "\n".join(lines)
 

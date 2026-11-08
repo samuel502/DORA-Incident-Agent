@@ -178,6 +178,7 @@ class CaseOutcome:
     service_found: str | None = None  # the incident service the agent settled on
     expected_service: str = ""  # the scenario's own service
     access_refused: bool = False  # ended on HTTP 401 or 403
+    seconds_used: float = 0.0  # the agent's own working time (block 6 step 3: time limit per run)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -210,7 +211,7 @@ def run_case(scenario: Scenario, provider: LlmProvider, *, as_of: datetime = AS_
         input_tokens=sum(r.get("input_tokens") or 0 for r in steps),
         output_tokens=sum(r.get("output_tokens") or 0 for r in steps),
         run_id=result.run_id, service_found=c.facts.service_id, expected_service=scenario.service_id,
-        access_refused=_access_refused(result),
+        access_refused=_access_refused(result), seconds_used=result.seconds_used,
     )
 
 

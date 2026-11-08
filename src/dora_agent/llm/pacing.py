@@ -37,18 +37,24 @@ class TokenPacer:
         while self._used and now - self._used[0][0] >= WINDOW_SECONDS:
             self._used.popleft()
 
-    def wait_for(self, estimated_input: int) -> None:
-        """Wait until a call of this size fits in the last minute's budget. Never longer than the window."""
+    def wait_for(self, estimated_input: int, deadline: float | None = None) -> bool:
+        """Wait until a call of this size fits in the last minute's budget. Never longer than the window.
+
+        deadline: a clock time the wait must not pass (the agent run's time limit), or None.
+        Returns True when the call may go ahead, or False, without waiting, if the wait would pass the deadline.
+        """
         if self._limit <= 0:
-            return
+            return True
         needed = estimated_input + self._last_output
         while True:
             now = self._clock()
             self._drop_old(now)
             used = sum(tokens for _, tokens in self._used)
             if not self._used or used + needed <= self._limit:
-                return  # fits, or nothing left to wait for (a call bigger than the limit goes alone)
+                return True  # fits, or nothing left to wait for (a call bigger than the limit goes alone)
             pause = WINDOW_SECONDS - (now - self._used[0][0]) + 0.1
+            if deadline is not None and now + pause > deadline:
+                return False
             self.waited_seconds += pause
             self._sleep(pause)
 

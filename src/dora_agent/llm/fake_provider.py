@@ -20,9 +20,12 @@ class FakeProvider:
     def __init__(self, script: list[Step]):
         self._script = list(script)
         self.calls: list[tuple[list[Message], list[ToolSpec]]] = []
+        self.time_left: list[float | None] = []  # what each call was given, for tests
 
-    def chat(self, messages: list[Message], tools: list[ToolSpec]) -> LlmResponse:
+    def chat(self, messages: list[Message], tools: list[ToolSpec], *,
+             time_left: float | None = None) -> LlmResponse:
         self.calls.append((list(messages), list(tools)))
+        self.time_left.append(time_left)
         if not self._script:
             raise LlmError("fake LLM: script has no more answers")
         step = self._script.pop(0)

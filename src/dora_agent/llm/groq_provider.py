@@ -15,6 +15,12 @@ Rate limits (block 5 step 5, config.toml [llm]):
   at most rate_limit_retries times and at most rate_limit_max_wait_seconds in total.
 - A dropped connection gets the same waits, at most connection_retries times, inside the same total cap.
 
+Run time limit (block 6 step 3, config.toml [agent] max_run_seconds, CLAUDE.md hard rule 8):
+- chat() gets `time_left` from the agent loop. Nothing in the call may go past it: no pacing wait,
+  no request and no retry wait. If one would, the call stops with LlmError code "time_limit".
+- Each request's timeout is cut to the time left. The Groq client's own retry (max_retries) is switched
+  off when the time left could not hold it, because that retry can itself wait up to 60 seconds.
+
 Access refused (HTTP 401 or 403): the message adds a fixed hint and a one-word tag for the kind of reply
 (json, html or empty). An html reply usually means a network block (VPN, proxy), not Groq's API itself.
 check_access() lists the models this key may use and checks the configured one is there: no tokens.
@@ -32,7 +38,7 @@ import groq
 
 from dora_agent.config import LlmSettings
 from dora_agent.llm.pacing import TokenPacer, estimate_tokens
-from dora_agent.llm.provider import LlmError, LlmResponse, Message, ToolCall, ToolSpec, Usage
+from dora_agent.llm.provider import TIME_LIMIT, LlmError, LlmResponse, Message, ToolCall, ToolSpec, Usage
 
 # Groq error codes that may be shown and logged. Anything else becomes "other" (never the raw text).
 ERROR_CODES = frozenset({
@@ -44,6 +50,14 @@ ERROR_CODES = frozenset({
 ACCESS_HINT = ("access refused: check the key, the model permissions in the Groq console, "
                "or the network (VPN or proxy)")
 
+# The longest the Groq client waits on its own before its own retry (it follows a retry-after header of
+# up to 60 seconds). Its retry is kept only if every attempt and this wait fit in the time left.
+CLIENT_RETRY_WAIT_SECONDS = 60
+
+
+def _time_limit(what: str) -> LlmError:
+    return LlmError(f"LLM call stopped: the run's time limit was reached ({what})", code=TIME_LIMIT)
+
 
 class GroqProvider:
     name = "groq"
@@ -53,6 +67,7 @@ class GroqProvider:
         """client, sleep, clock: only for tests, to pass stand-ins instead of the real ones."""
         self._settings = settings
         self._sleep = sleep
+        self._clock = clock
         self._pacer = TokenPacer(settings.tokens_per_minute, clock=clock, sleep=sleep)
         if client is not None:
             self._client = client
@@ -65,7 +80,8 @@ class GroqProvider:
     def __repr__(self) -> str:
         return f"GroqProvider(model={self._settings.model!r})"
 
-    def chat(self, messages: list[Message], tools: list[ToolSpec]) -> LlmResponse:
+    def chat(self, messages: list[Message], tools: list[ToolSpec], *,
+             time_left: float | None = None) -> LlmResponse:
         request = {
             "model": self._settings.model,
             "messages": [_to_wire(m) for m in messages],
@@ -75,9 +91,11 @@ class GroqProvider:
         if tools:
             request["tools"] = [_tool_to_wire(t) for t in tools]
             request["tool_choice"] = "auto"
+        deadline = None if time_left is None else self._clock() + time_left
         estimate = estimate_tokens([request["messages"], request.get("tools")])
-        self._pacer.wait_for(estimate)
-        response = self._create_with_retries(request)
+        if not self._pacer.wait_for(estimate, deadline):
+            raise _time_limit("the wait for the tokens-per-minute budget would pass it")
+        response = self._call(lambda client: client.chat.completions.create(**request), deadline)
         result = _from_wire(response)
         self._pacer.record(result.usage.input_tokens or estimate, result.usage.output_tokens)
         return result
@@ -88,23 +106,49 @@ class GroqProvider:
         models.list, not models.retrieve: a model ID with a slash (openai/gpt-oss-120b) breaks the
         retrieve URL and gives a false HTTP 404 (live check, 6 Nov 2026). Raises LlmError if access fails.
         """
-        listing = self._call(lambda: self._client.models.list())
+        listing = self._call(lambda client: client.models.list())
         ids = {str(getattr(m, "id", "")) for m in (getattr(listing, "data", None) or [])}
         if self._settings.model not in ids:
             raise LlmError(f"access works, but the model {self._settings.model!r} is not in the list of models "
                            "this key may use: check config.toml [llm] model and the model permissions in the "
                            "Groq console", code="model_not_found")
 
-    def _create_with_retries(self, request: dict):
-        return self._call(lambda: self._client.chat.completions.create(**request))
+    def _client_for(self, deadline: float | None):
+        """The client for one attempt, and whether its timeout was cut short by the run's time limit.
 
-    def _call(self, send: Callable[[], object]):
-        """Send one request, waiting and retrying on rate limits and dropped connections (config.toml [llm])."""
+        No deadline: the client as configured. With one: the timeout is cut to the time left, and the
+        client's own retry is kept only if all its attempts and its own wait fit in the time left.
+        """
+        if deadline is None:
+            return self._client, False
+        settings = self._settings
+        left = deadline - self._clock()
+        if left <= 0:
+            raise _time_limit("no time left for the request")
+        timeout = min(float(settings.timeout_seconds), left)
+        needed = ((settings.max_retries + 1) * settings.timeout_seconds
+                  + settings.max_retries * CLIENT_RETRY_WAIT_SECONDS)
+        retries = settings.max_retries if left >= needed else 0
+        return self._client.with_options(timeout=timeout, max_retries=retries), timeout < settings.timeout_seconds
+
+    def _wait(self, pause: float, deadline: float | None, after: str) -> None:
+        """Wait before a retry, unless the wait would pass the run's time limit."""
+        if deadline is not None and self._clock() + pause > deadline:
+            raise _time_limit(f"the wait after {after} would pass it")
+        self._sleep(pause)
+
+    def _call(self, send: Callable[[object], object], deadline: float | None = None):
+        """Send one request, waiting and retrying on rate limits and dropped connections (config.toml [llm]).
+
+        send: gets the client to use for this attempt.
+        deadline: a clock time that no request or wait may pass (the run's time limit), or None.
+        """
         settings = self._settings
         waited, rate_retries, connection_retries = 0.0, 0, 0
         while True:
+            client, cut_short = self._client_for(deadline)
             try:
-                return send()
+                return send(client)
             except groq.RateLimitError as error:
                 pause = _retry_after(error) or float(2 ** (rate_retries + 1))
                 if rate_retries >= settings.rate_limit_retries or waited + pause > settings.rate_limit_max_wait_seconds:
@@ -112,7 +156,10 @@ class GroqProvider:
                                    f"after {rate_retries} retries and {waited:.0f} s waiting",
                                    code=_error_code(error) or "rate_limit_exceeded", status=429) from None
                 rate_retries += 1
+                after = "a rate limit"
             except groq.APITimeoutError:  # a kind of connection error, so it is caught first
+                if cut_short:
+                    raise _time_limit("the request was cut short") from None
                 raise LlmError(f"LLM call timed out after {settings.timeout_seconds} s") from None
             except groq.APIConnectionError:
                 pause = float(2 ** (connection_retries + 1))
@@ -121,6 +168,7 @@ class GroqProvider:
                     raise LlmError(f"LLM call failed: the connection to the provider failed (APIConnectionError) "
                                    f"after {connection_retries} retries", code="connection_failed") from None
                 connection_retries += 1
+                after = "a dropped connection"
             except groq.APIStatusError as error:
                 code = _error_code(error)
                 message = (f"LLM call refused: {type(error).__name__} "
@@ -130,7 +178,7 @@ class GroqProvider:
                 raise LlmError(message, code=code, status=error.status_code) from None
             except groq.GroqError as error:  # base of every groq error
                 raise LlmError(f"LLM call failed: {type(error).__name__}") from None
-            self._sleep(pause)
+            self._wait(pause, deadline, after)
             waited += pause
 
 

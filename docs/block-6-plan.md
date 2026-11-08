@@ -61,6 +61,7 @@ Done in step 1 (option A): `AgentRun.log`, read-only. The page passes it to `pre
 - The loop checks the clock before every LLM call and every tool call. Each LLM call, and its waits for rate limits, is cut short to the time left, so the limit is hard, not "finish the current call first".
 - When time runs out, the run stops with stop reason `time_limit`. The rules engine gives its result on the facts so far, and the missing facts are listed, as with the other limits.
 - This changes `src/dora_agent/agent/loop.py` and the LLM call path. Tests: a fake clock, a run that hits the limit, and a slow fake LLM call cut short.
+- Built in step 3: the provider interface's `chat()` takes an optional `time_left`. The Groq provider skips any pacing or retry wait that would pass it, cuts each request's timeout to it, and switches off the Groq client's own hidden retry when the time left can't hold it (that retry can wait up to 60 seconds by itself). Each run's working time is shown in the result and recorded in the case reports, for block 8.
 
 ## 10. Running it: Colab only, no public link
 

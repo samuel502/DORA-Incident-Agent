@@ -40,7 +40,7 @@ class IdealLlm:
         self._asked: set[str] = set()
         self.calls = 0
 
-    def chat(self, messages: list[Message], tools: list[ToolSpec]) -> LlmResponse:
+    def chat(self, messages: list[Message], tools: list[ToolSpec], time_left: float | None = None) -> LlmResponse:
         self.calls += 1
         s = self._s
         if self._stage == 0:

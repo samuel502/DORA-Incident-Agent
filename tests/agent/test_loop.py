@@ -287,7 +287,7 @@ def test_llm_error_stops_cleanly_with_the_engine_result_so_far():
     class Broken:
         name = "broken"
 
-        def chat(self, messages, tools):
+        def chat(self, messages, tools, time_left=None):
             raise LlmError("LLM call timed out after 30 s")
 
     result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), Broken()).start()
@@ -370,7 +370,7 @@ class RefusesThen:
         self._n, self._fake = n, FakeProvider(script)
         self.seen = []
 
-    def chat(self, messages, tools):
+    def chat(self, messages, tools, time_left=None):
         self.seen.append(list(messages))
         if self._n:
             self._n -= 1
@@ -404,7 +404,7 @@ def test_other_llm_errors_are_not_retried():
     class RateLimited:
         name = "fake"
 
-        def chat(self, messages, tools):
+        def chat(self, messages, tools, time_left=None):
             raise LlmError("LLM call refused: RateLimitError (HTTP 429, rate_limit_exceeded)",
                            code="rate_limit_exceeded")
 
@@ -545,3 +545,119 @@ def test_log_kind_cannot_be_given_twice():
     with pytest.raises(TypeError):  # "kind" is write()'s own first argument: Python refuses it twice
         run.log.write("notification_draft", **{"kind": "result"})
     assert run.log.records == before
+
+
+# ---------- block 6 step 3: hard total time limit per run (config.toml [agent] max_run_seconds) ----------
+
+
+class Clock:
+    """A stand-in clock. Time moves only when a test or a slow stand-in LLM moves it."""
+
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+class SlowLlm:
+    """Plays a script like FakeProvider, but each call takes `seconds` on the stand-in clock."""
+
+    name = "fake"
+
+    def __init__(self, clock, seconds, script):
+        self._clock, self._seconds, self._fake = clock, seconds, FakeProvider(script)
+        self.time_left = []
+
+    def chat(self, messages, tools, time_left=None):
+        self.time_left.append(time_left)
+        self._clock.now += self._seconds
+        return self._fake.chat(messages, tools)
+
+
+def limited(seconds):
+    return replace(agent_limits(), max_run_seconds=seconds)
+
+
+def test_time_limit_is_600_seconds_in_config():
+    assert agent_limits().max_run_seconds == 600
+
+
+def test_a_run_inside_the_limit_is_not_affected_and_records_its_working_time():
+    clock = Clock()
+    llm = SlowLlm(clock, 10, b01_script())
+    result = AgentRun("Online banking down since 9:10, customers can't log in.", t("2026-05-26T07:15:00Z"),
+                      llm, clock=clock, limits=limited(600)).start()
+    assert (result.stop_reason, result.classification.result) == ("final_result", "major")
+    assert result.seconds_used == 10.0 * result.steps_used
+    assert llm.time_left == [600 - 10.0 * n for n in range(result.steps_used)]  # every call gets the time left
+    assert result.trace[-1]["seconds_used"] == result.seconds_used
+
+
+def test_slow_llm_hits_the_time_limit_and_the_engine_still_gives_the_result():
+    clock = Clock()
+    llm = SlowLlm(clock, 250, b01_script())
+    result = AgentRun("Online banking down since 9:10, customers can't log in.", t("2026-05-26T07:15:00Z"),
+                      llm, clock=clock, limits=limited(300)).start()
+    # Call 1 took 250 s (50 left), call 2 took 250 s more: its tool call is not run, and the run stops.
+    assert llm.time_left == [300, 50]
+    assert (result.status, result.stop_reason) == ("stopped", "time_limit")
+    assert result.tool_calls_used == 1
+    assert result.classification.result == "undetermined"  # the engine's result on the facts so far
+    assert "time limit of 300 seconds" in result.message
+    assert result.trace[-1]["stop_reason"] == "time_limit"
+    assert result.tool_path == ("find_service",)  # get_service, proposed after the time ran out, never ran
+
+
+def test_no_llm_call_starts_once_the_time_is_up():
+    clock = Clock()
+    llm = SlowLlm(clock, 300, b01_script())
+    result = AgentRun("Online banking down since 9:10, customers can't log in.", t("2026-05-26T07:15:00Z"),
+                      llm, clock=clock, limits=limited(300)).start()
+    assert llm.time_left == [300]  # the first call used all the time; no second call was made
+    assert result.stop_reason == "time_limit" and result.steps_used == 1 and result.tool_calls_used == 0
+
+
+def test_provider_stopping_at_the_time_limit_ends_the_run_with_time_limit():
+    class OutOfTime:
+        name = "fake"
+
+        def chat(self, messages, tools, time_left=None):
+            raise LlmError("LLM call stopped: the run's time limit was reached (the wait after a rate limit "
+                           "would pass it)", code="time_limit")
+
+    result = AgentRun("Online banking down.", t("2026-05-26T07:15:00Z"), OutOfTime()).start()
+    assert (result.status, result.stop_reason) == ("stopped", "time_limit")
+    assert any(r["kind"] == "llm_error" and r["code"] == "time_limit" for r in result.trace)
+
+
+def test_time_waiting_for_a_person_does_not_count():
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cases"))
+    from ideal_llm import IdealLlm
+
+    from dora_agent.evaluation.case_runner import AS_OF, SCRIPTED_HUMAN, ScriptedHuman, load_scenarios
+
+    scenario = next(s for s in load_scenarios() if s.scenario_id == "C02")
+    clock = Clock()
+    ideal = IdealLlm(scenario)
+
+    class Timed:
+        name = "fake"
+
+        def chat(self, messages, tools, time_left=None):
+            clock.now += 20
+            return ideal.chat(messages, tools)
+
+    run = AgentRun(scenario.ticket, scenario.around, Timed(), as_of=AS_OF, clock=clock, limits=limited(600))
+    paused = run.start()
+    assert paused.status == "needs_human"
+    clock.now += 10_000  # the person takes almost three hours to answer
+    human = ScriptedHuman(scenario.human_answers)
+    answers, estimates = human.answer(paused.questions)
+    result = run.resume(confirmed_by=SCRIPTED_HUMAN, answers=answers, estimates=estimates,
+                        review=human.review(paused.review_items))
+    assert result.stop_reason != "time_limit"
+    assert result.seconds_used == 20.0 * result.steps_used  # the 10,000 s wait is not counted

@@ -17,6 +17,10 @@ from pydantic import BaseModel, ConfigDict, Field
 # Longest raw tool-argument text kept when the LLM sends something that is not valid JSON.
 MAX_RAW_ARGUMENTS_CHARS = 2000
 
+# LlmError code for a call stopped because the agent run's total time limit was reached
+# (config.toml [agent] max_run_seconds, CLAUDE.md hard rule 8).
+TIME_LIMIT = "time_limit"
+
 
 class Frozen(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -109,6 +113,11 @@ class LlmProvider(Protocol):
 
     name: str
 
-    def chat(self, messages: list[Message], tools: list[ToolSpec]) -> LlmResponse:
-        """Send the conversation and the allowed tools. Raise LlmError on any failure."""
+    def chat(self, messages: list[Message], tools: list[ToolSpec], *,
+             time_left: float | None = None) -> LlmResponse:
+        """Send the conversation and the allowed tools. Raise LlmError on any failure.
+
+        time_left: seconds the agent run has left (hard rule 8), or None for no run limit. A provider must
+        not wait or keep a request open past it: it raises LlmError with code TIME_LIMIT instead.
+        """
         ...

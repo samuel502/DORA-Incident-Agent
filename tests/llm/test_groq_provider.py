@@ -349,3 +349,120 @@ def test_access_check_reports_a_block_plainly():
     with pytest.raises(LlmError) as caught:
         GroqProvider(llm_settings(), client=client).check_access()
     assert caught.value.status == 403 and "reply: html" in str(caught.value)
+
+
+# ---------- block 6 step 3: the run's time limit (time_left) ----------
+
+
+class OptionsClient(Flaky):
+    """Also records with_options(): the timeout and the client's own retries for each attempt."""
+
+    def __init__(self, errors=(), final=None):
+        super().__init__(errors, final if final is not None else answer("ok"))
+        self.options = []
+
+    def with_options(self, **options):
+        self.options.append(options)
+        return self
+
+
+class Time:
+    def __init__(self):
+        self.now, self.slept = 0.0, []
+
+    def clock(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def timed(client, time):
+    return GroqProvider(llm_settings(), client=client, sleep=time.sleep, clock=time.clock)
+
+
+X = [Message(role="user", content="x")]
+
+
+def test_without_time_left_the_client_is_used_as_configured():
+    client = OptionsClient()
+    GroqProvider(llm_settings(), client=client, sleep=no_sleep).chat(X, [])
+    assert client.options == []
+
+
+def test_plenty_of_time_keeps_the_configured_timeout_and_retries():
+    client = OptionsClient()
+    timed(client, Time()).chat(X, [], time_left=500)
+    s = llm_settings()
+    assert client.options == [{"timeout": float(s.timeout_seconds), "max_retries": s.max_retries}]
+
+
+def test_little_time_turns_off_the_clients_own_retry():
+    client = OptionsClient()
+    timed(client, Time()).chat(X, [], time_left=100)  # 2 x 30 s attempts + up to 60 s wait = 120 s > 100 s
+    assert client.options == [{"timeout": 30.0, "max_retries": 0}]
+
+
+def test_request_timeout_is_cut_to_the_time_left():
+    client = OptionsClient()
+    timed(client, Time()).chat(X, [], time_left=12.5)
+    assert client.options == [{"timeout": 12.5, "max_retries": 0}]
+
+
+def test_no_time_left_means_no_request():
+    client = OptionsClient()
+    with pytest.raises(LlmError) as caught:
+        timed(client, Time()).chat(X, [], time_left=0)
+    assert caught.value.code == "time_limit" and client.requests == []
+
+
+def test_request_cut_short_by_the_time_limit_says_so():
+    client = OptionsClient(errors=[groq.APITimeoutError(request=REQUEST)])
+    with pytest.raises(LlmError) as caught:
+        timed(client, Time()).chat(X, [], time_left=12.5)
+    assert caught.value.code == "time_limit" and "cut short" in str(caught.value)
+
+
+def test_full_length_timeout_is_still_a_normal_timeout():
+    client = OptionsClient(errors=[groq.APITimeoutError(request=REQUEST)])
+    with pytest.raises(LlmError) as caught:
+        timed(client, Time()).chat(X, [], time_left=500)
+    assert caught.value.code is None and "timed out after 30 s" in str(caught.value)
+
+
+def test_rate_limit_wait_that_would_pass_the_limit_is_not_started():
+    time = Time()
+    client = OptionsClient(errors=[status_error(groq.RateLimitError, 429, headers={"retry-after": "7.5"})])
+    with pytest.raises(LlmError) as caught:
+        timed(client, time).chat(X, [], time_left=5)
+    assert caught.value.code == "time_limit" and "rate limit" in str(caught.value)
+    assert time.slept == [] and len(client.requests) == 1
+
+
+def test_rate_limit_wait_inside_the_limit_still_happens():
+    time = Time()
+    client = OptionsClient(errors=[status_error(groq.RateLimitError, 429, headers={"retry-after": "7.5"})])
+    assert timed(client, time).chat(X, [], time_left=200).text == "ok"
+    assert time.slept == [7.5]
+    assert [o["timeout"] for o in client.options] == [30.0, 30.0]
+
+
+def test_dropped_connection_wait_that_would_pass_the_limit_is_not_started():
+    time = Time()
+    client = OptionsClient(errors=[groq.APIConnectionError(message="conn", request=REQUEST)])
+    with pytest.raises(LlmError) as caught:
+        timed(client, time).chat(X, [], time_left=1)
+    assert caught.value.code == "time_limit" and "dropped connection" in str(caught.value)
+    assert time.slept == []
+
+
+def test_pacing_wait_that_would_pass_the_limit_stops_the_call():
+    time = Time()
+    client = OptionsClient(final=answer("ok", prompt_tokens=8000, completion_tokens=0))
+    provider = timed(client, time)
+    provider.chat(X, [], time_left=600)  # uses all of the 8,000 tokens per minute
+    with pytest.raises(LlmError) as caught:
+        provider.chat(X, [], time_left=20)  # the next call would have to wait about a minute
+    assert caught.value.code == "time_limit" and "tokens-per-minute" in str(caught.value)
+    assert time.slept == [] and len(client.requests) == 1
