@@ -30,7 +30,7 @@ A working prototype of a DORA incident classification agent for a simulated bank
 
 ## Decisions (confirmed)
 
-- Runs locally and in Google Colab from the same code
+- Runs in Google Colab only, like Sam's OSINT project: open the notebook, add your own Groq key in Colab Secrets, run the cells. No local launch. The key is never saved anywhere. The offline pytest suite still runs on a development machine. Live tests run from a Colab notebook cell. Changed 6 November 2026, approved by Sam (replaces "runs locally and in Google Colab from the same code").
 - LLM: Groq, `openai/gpt-oss-120b`, behind a swappable provider interface
 - Output as described above
 - Out-of-scope list as above
@@ -56,7 +56,7 @@ Each block is built, explained, tested by Sam and approved before the next one s
 - Agent picks different tool paths for different incidents, shown in tests
 - All security tests pass, including prompt injection hidden in tickets and logs
 - No secrets in the repo (scanner clean)
-- Runs locally and in Colab with the documented steps
+- Runs in Colab with the documented steps (short Colab guide in the README)
 - README states measured results, how to run it, and its limits
 - Sam has reviewed and approved every block
 
@@ -65,4 +65,13 @@ Each block is built, explained, tested by Sam and approved before the next one s
 - Scope is locked here first. Changes go through this file.
 - No dependence on outside websites that can block or rate-limit us.
 - "Works" is defined by tests with known answers.
-- The README is written last, from what actually works.
+- The README is written last, from what actually works. A short placeholder README (what the tool is, work in progress, Colab only) exists from block 6. The full README is block 9.
+
+## Lessons from Sam's OSINT project, built into the interface (added 8 November 2026, approved by Sam)
+
+- The page is launched with `share=False`, `server_name="0.0.0.0"`, `inline=False`, `prevent_thread_lock=True` and `ssr_mode=False`, and shown inside the notebook with `google.colab.output.serve_kernel_port_as_iframe`. No public link.
+- Re-running the launch cell closes the old server first.
+- The launch function returns nothing, so Colab does not print the Blocks object.
+- Every agent run has a hard total time limit, set in config.
+- All requirements are pinned to exact versions.
+- The notebook's first markdown cell has a troubleshooting section: third-party cookies, fresh runtime, re-running only the launch cell, the key secret with notebook access, VPN access errors.

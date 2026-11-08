@@ -18,8 +18,8 @@ The risks that matter most here:
 | Sensitive data leak | Someone asks the agent to dump all client data | Tools return only the few values needed (counts, times, yes/no), never full records. |
 | Excessive agency | The agent tries to change or delete data | Every tool is read-only. No write tool exists. |
 | System prompt leak | "Show me your instructions" | No secrets or sensitive logic in the prompt. Tests try to extract it. |
-| Unbounded consumption | The agent loops forever or burns API calls | Hard limits on steps and tool calls per incident. Timeouts on LLM calls. |
-| Secret leak | API key ends up in the repo or logs | Key only from environment variables. Never logged. Secret scanner on every commit. |
+| Unbounded consumption | The agent loops forever or burns API calls | Hard limits on steps and tool calls per incident, and a hard total time limit per run. Timeouts on LLM calls. |
+| Secret leak | API key ends up in the repo or logs | Key only from the user's own Colab Secrets, held in the Colab runtime's memory for that session, never saved to a file. Never printed or logged (the log masks it). Secret scanner on every commit. |
 | Supply chain | A dependency has a known vulnerability | Pinned dependencies. Automatic dependency audit. |
 | Unsafe output | Agent output breaks or attacks the interface | Output is shown as plain text, not rendered as HTML. |
 | Bad input | Huge or malformed input crashes the tool | Input length limits and validation. Tool inputs and outputs checked against a fixed schema. |
@@ -30,7 +30,7 @@ The risks that matter most here:
 - All tools are read-only and go through connectors.
 - Tools take fixed, validated parameters, not free text queries.
 - Every prompt separates instructions from untrusted data clearly.
-- Agent loop has max steps, max tool calls and timeouts in config.
+- Agent loop has max steps, max tool calls, a total time limit per run and timeouts in config.
 - Logs record facts, sources, rule version and result, but never secrets.
 - LLM provider is swappable, so a bank could use its own approved model.
 
