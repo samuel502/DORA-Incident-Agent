@@ -298,3 +298,15 @@ def test_views_do_not_use_gradio_or_build_html():
     source = VIEWS_PY.read_text(encoding="utf-8")
     assert "escape(" not in source
     assert not re.search(r"</?(b|i|p|div|span|br|a|script)\b", source.split('"""', 2)[2])  # no tags after the docstring
+
+
+def test_trace_numbers_run_without_gaps_across_rounds_and_the_draft(draft_and_approval):
+    run, _, _ = draft_and_approval
+    lines = views.trace_text(run.log.records).split("\n")
+    assert [line.split(" ", 1)[0] for line in lines] == [f"#{n}" for n in range(1, len(lines) + 1)]
+
+
+def test_trace_numbers_run_without_gaps_after_a_round_of_questions():
+    run, result = run_to_end("C02")
+    assert result.human_rounds >= 1
+    assert [r["seq"] for r in result.trace] == list(range(1, len(result.trace) + 1))

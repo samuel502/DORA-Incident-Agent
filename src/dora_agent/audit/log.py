@@ -22,6 +22,8 @@ from typing import Any
 from dora_agent.config import llm_settings
 
 MASK = "[REDACTED]"
+# Fields every record gets from the log itself.
+RESERVED = frozenset({"run_id", "seq", "at", "kind"})
 
 
 class DecisionLog:
@@ -38,6 +40,11 @@ class DecisionLog:
         return [dict(r) for r in self._records]
 
     def write(self, kind: str, **data: Any) -> dict[str, Any]:
+        # The log's own fields can't be overwritten by the data: run_id, seq (1, 2, 3 ... without gaps),
+        # at and kind always come from the log itself (block 6 step 2 fix, approved by Sam).
+        clash = sorted(RESERVED & set(data))
+        if clash:
+            raise ValueError(f"log data may not set the log's own fields: {', '.join(clash)}")
         record = {
             "run_id": self.run_id,
             "seq": len(self._records) + 1,

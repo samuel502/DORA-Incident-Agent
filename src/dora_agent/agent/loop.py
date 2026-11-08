@@ -351,7 +351,10 @@ class AgentRun:
     def _log_new_events(self) -> None:
         events = self._store.events
         for event in events[self._logged_events:]:
-            self._log.write("fact", **event.model_dump())
+            data = event.model_dump()
+            # The fact store's own counter is kept as event_seq, so it never takes the log's seq.
+            data["event_seq"] = data.pop("seq")
+            self._log.write("fact", **data)
         self._logged_events = len(events)
 
     def _end(self, status: Status, reason: StopReason, detail: str | None = None) -> RunResult:

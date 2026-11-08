@@ -510,3 +510,38 @@ def test_run_log_cannot_be_replaced():
     run = b01_run()
     with pytest.raises(AttributeError):
         run.log = None
+
+
+# ---------- block 6 step 2 fix: the log numbers every record 1, 2, 3 ... without gaps ----------
+
+
+def test_log_numbers_run_without_gaps_in_memory_and_in_the_file(tmp_path):
+    run = b01_run(log_dir=tmp_path, run_id="numbering01")
+    result = run.start()
+    assert any(r["kind"] == "fact" for r in result.trace)  # fact records used to take the store's number
+    assert [r["seq"] for r in result.trace] == list(range(1, len(result.trace) + 1))
+    lines = (tmp_path / "numbering01.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["seq"] for line in lines] == list(range(1, len(lines) + 1))
+
+
+def test_fact_records_keep_the_fact_store_number_as_event_seq():
+    result = b01_run().start()
+    facts = [r for r in result.trace if r["kind"] == "fact"]
+    assert [r["event_seq"] for r in facts] == list(range(1, len(facts) + 1))
+
+
+@pytest.mark.parametrize("field", ["run_id", "seq", "at"])
+def test_log_data_cannot_overwrite_the_logs_own_fields(field):
+    run = b01_run()
+    before = run.log.records
+    with pytest.raises(ValueError, match="log's own fields"):
+        run.log.write("notification_draft", **{field: "fake"})
+    assert run.log.records == before  # nothing was written
+
+
+def test_log_kind_cannot_be_given_twice():
+    run = b01_run()
+    before = run.log.records
+    with pytest.raises(TypeError):  # "kind" is write()'s own first argument: Python refuses it twice
+        run.log.write("notification_draft", **{"kind": "result"})
+    assert run.log.records == before
