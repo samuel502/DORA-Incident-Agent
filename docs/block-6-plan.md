@@ -67,7 +67,7 @@ Done in step 1 (option A): `AgentRun.log`, read-only. The page passes it to `pre
 
 - `notebooks/colab.ipynb` is the only way to run the tool. No local launch, no `__main__.py`, no login code.
 - Cells: (1) clone the repo and install the pinned requirements, (2) read the key from Colab Secrets into memory, (3) start the page, (4) optional live tests.
-- Cells 1, 2 and 4 exist now. Cell 3 comes in step 5.
+- All four cells exist (step 5). The setup cell prints how long it took, and asks for a session restart if Colab had already loaded an older copy of a pinned package.
 - The first markdown cell has the troubleshooting section (cookies, fresh runtime, re-running only the launch cell, the key secret with notebook access, VPN errors).
 
 The launch function in `src/dora_agent/ui/launch.py`:
@@ -86,7 +86,7 @@ Tests (no Colab needed, with a stand-in for Gradio and `google.colab`): the laun
 ## 11. Requirements
 
 - Gradio is added to `requirements.txt` at one exact version, together with every package it pulls in, each at an exact version.
-- Gradio's own version ranges may clash with our current pins (for example pydantic or httpx). If they do, I tell you which pin has to move and why before changing it.
+- Done in step 5: Gradio 6.30.0 fits all earlier pins; nothing had to move. 60 exact pins, resolved for Linux on Python 3.12 and 3.13, each with a ready-built wheel. Three platform markers: audioop-lts (Python 3.13+), colorama and tzdata (Windows only).
 
 ## Files
 
