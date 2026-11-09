@@ -86,7 +86,8 @@ Tests (no Colab needed, with a stand-in for Gradio and `google.colab`): the laun
 ## 11. Requirements
 
 - Gradio is added to `requirements.txt` at one exact version, together with every package it pulls in, each at an exact version.
-- Done in step 5: Gradio 6.30.0 fits all earlier pins; nothing had to move. 60 exact pins, resolved for Linux on Python 3.12 and 3.13, each with a ready-built wheel. Three platform markers: audioop-lts (Python 3.13+), colorama and tzdata (Windows only).
+- Done in step 5: Gradio 6.30.0 fits all earlier pins; nothing had to move. 60 exact pins, resolved for Linux on Python 3.12 and 3.13, each with a ready-built wheel. Two platform markers: audioop-lts (Python 3.13+) and colorama (Windows only).
+- Fix after step 5: tzdata was pinned for Windows only, but python-dateutil 4.0.0 needs it on Linux too, so Colab would have installed an unpinned tzdata. The marker is gone; tzdata==2026.6 now installs everywhere. Checked by reading each pinned package's Linux dependencies for Python 3.12 and 3.13: no unpinned package left.
 
 ## Files
 
