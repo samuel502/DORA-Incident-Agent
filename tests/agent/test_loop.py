@@ -726,3 +726,49 @@ def test_ask_human_with_mixed_facts_pauses_for_the_ones_with_questions():
     assert paused.status == "needs_human"
     assert [q.fact_name for q in paused.questions] == ["media_coverage"]
     assert paused.tool_path == ("get_service", "ask_human")  # not refused
+
+
+# ---------- shorter prompts for the free tier (approved by Sam on 11 November 2026) ----------
+
+
+def _tool_texts(messages):
+    return [m.content for m in messages if m.role == "tool"]
+
+
+def test_older_full_run_rules_answers_become_a_stub_and_the_newest_stays():
+    fake = FakeProvider([
+        call("get_service", service_id="SVC-OLB"),
+        call("run_rules"),
+        call("get_outage_timeline", service_id="SVC-OLB"),
+        call("run_rules"),
+        call("run_rules"),  # nothing changed: the short answer
+        say("done"),
+    ])
+    AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    texts = _tool_texts(fake.calls[-1][0])
+    rules = [texts[1], texts[3], texts[4]]  # the three run_rules answers, in order
+    assert "older run_rules result, replaced by a newer one" in rules[0]
+    assert "where_to_find" in rules[1]  # the newest full answer is kept: the short one refers to it
+    assert '"unchanged": true' in rules[2]
+
+
+def test_trimming_never_touches_the_decision_log():
+    fake = FakeProvider([call("get_service", service_id="SVC-OLB"), call("run_rules"),
+                         call("get_outage_timeline", service_id="SVC-OLB"), call("run_rules"), say("done")])
+    result = AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    checks = [r for r in result.trace if r["kind"] == "rules_check"]
+    # One after each of the 4 tool steps, and one when the LLM says it is done, as before.
+    assert len(checks) == 5 and all("missing" in r for r in checks)
+
+
+def test_get_service_and_run_rules_in_one_answer_see_the_service():
+    fake = FakeProvider([many(call("run_rules"), call("get_service", service_id="SVC-OLB")), say("done")])
+    AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    rules = json.loads(_tool_texts(fake.calls[1][0])[0].split("\n", 1)[1].rsplit("\n", 1)[0])
+    assert "critical_or_important" in rules["known"]  # get_service ran first
+
+
+def test_instructions_ask_for_get_service_and_run_rules_together():
+    from dora_agent.agent.prompts import SYSTEM_PROMPT
+    assert "get_service and run_rules together in one answer" in SYSTEM_PROMPT
+    assert "known lists facts already held" in SYSTEM_PROMPT

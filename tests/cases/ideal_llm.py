@@ -55,8 +55,10 @@ class IdealLlm:
         last = messages[-1]
         if last.role == "tool":
             content = _tool_content(last)
-            if "result" in content and "missing" in content:  # a run_rules result that was not final
-                wanted = list(content["missing"]) + list(content["waiting_for_human"])
+            if "result" in content and "where_to_find" in content:  # a full run_rules result, not final
+                # where_to_find holds every missing fact (the separate "missing" list is no longer sent).
+                missing = [f for facts in content["where_to_find"].values() for f in facts]
+                wanted = missing + list(content.get("waiting_for_human", []))
                 ask = [f for f in dict.fromkeys(wanted) if f in QUESTIONS and f not in self._asked]
                 if ask:
                     self._asked.update(ask)

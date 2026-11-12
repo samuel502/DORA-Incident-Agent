@@ -88,6 +88,9 @@ class GroqProvider:
             "temperature": self._settings.temperature,
             "max_completion_tokens": self._settings.max_output_tokens,
         }
+        if self._settings.reasoning_effort:
+            # Less hidden reasoning per step: fewer output tokens against the tokens-per-minute limit.
+            request["reasoning_effort"] = self._settings.reasoning_effort
         if tools:
             request["tools"] = [_tool_to_wire(t) for t in tools]
             request["tool_choice"] = "auto"
@@ -97,7 +100,7 @@ class GroqProvider:
             raise _time_limit("the wait for the tokens-per-minute budget would pass it")
         response = self._call(lambda client: client.chat.completions.create(**request), deadline)
         result = _from_wire(response)
-        self._pacer.record(result.usage.input_tokens or estimate, result.usage.output_tokens)
+        self._pacer.record(result.usage.input_tokens or estimate, result.usage.output_tokens, estimate)
         return result
 
     def check_access(self) -> None:

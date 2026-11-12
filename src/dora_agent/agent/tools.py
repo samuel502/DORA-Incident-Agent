@@ -141,6 +141,9 @@ class RunContext:
     # Earlier results of read-only lookups, by tool and exact arguments (repeated calls).
     remembered: dict[str, dict[str, Any]] = field(default_factory=dict)
     repeats: int = 0
+    # The facts (and conflicts) the LLM's last FULL run_rules answer was based on. If nothing changed since,
+    # run_rules answers briefly (block 6, C01 live test, approved by Sam on 11 November 2026).
+    rules_seen: str | None = None
 
     def queue_question(self, name: str) -> bool:
         """Queue a fixed question unless it was already asked in this run. True if it was queued."""
@@ -276,8 +279,24 @@ def _ok(tool: str, content: dict, recorded: list[str] = (), note: str | None = N
     return ToolOutcome(tool=tool, ok=True, content=content, facts_recorded=tuple(recorded))
 
 
+# Parts of a connector result the LLM does not need to choose its next tool (shorter prompts, approved by Sam
+# on 11 November 2026). "source" names the system and record IDs: record IDs are still in each record, and
+# where every fact came from is written to the decision log by the fact store. "method" is a fixed text.
+# "event_id" is internal to monitoring (the record to pick is the problem_id). Fields with no value (null)
+# are left out too: a field that is not there means the system does not know it.
+_NOT_FOR_LLM = frozenset({"source", "method", "event_id"})
+
+
 def _dump(model) -> dict:
-    return model.model_dump(mode="json")
+    return _for_llm(model.model_dump(mode="json"))
+
+
+def _for_llm(node):
+    if isinstance(node, dict):
+        return {k: _for_llm(v) for k, v in node.items() if k not in _NOT_FOR_LLM and v is not None}
+    if isinstance(node, list):
+        return [_for_llm(v) for v in node]
+    return node
 
 
 # ---------- handlers: bank systems (read-only) ----------
@@ -482,64 +501,95 @@ def where_to_find(missing: tuple[str, ...]) -> dict[str, list[str]]:
     return grouped
 
 
+UNCHANGED_NOTE = ("no fact changed since your last run_rules: same result, same missing facts. Use that "
+                  "result's where_to_find, or ask_human, or stop.")
+
+
 def _run_rules(box: Toolbox, args: NoArgs) -> ToolOutcome:
-    result = classify(box._store.snapshot(), box.context.as_of)
+    facts = box._store.snapshot()
+    result = classify(facts, box.context.as_of)
     box.context.last_classification = result
-    return _ok("run_rules", {
+    conflicts = [c.describe() for c in box._store.conflicts()]
+    # Same facts and conflicts in, same result out: the engine is plain code (hard rule 1). So the full
+    # answer, which the LLM already has, is not sent again. The result word is always sent.
+    seen = json.dumps([facts.model_dump(mode="json"), conflicts], sort_keys=True, default=str)
+    if seen == box.context.rules_seen:
+        return _ok("run_rules", {"result": result.result, "unchanged": True, "note": UNCHANGED_NOTE})
+    box.context.rules_seen = seen
+    content = {
         "result": result.result,
-        "summary": result.summary,
         "thresholds_met": list(result.thresholds_met),
         "check_first": check_first(result),
-        "missing": list(result.missing),
+        # Every missing fact is in where_to_find (a test checks), so a separate "missing" list is not sent.
+        # The full list stays in the code (last_classification) and in the decision log.
         "where_to_find": where_to_find(result.missing),
         "waiting_for_human": list(result.pending_confirmations),
-        "conflicts": [c.describe() for c in box._store.conflicts()],
-    })
+        # Facts already held from a system or a person, by name only: nothing to look up or suggest for them.
+        "known": [name for name, fact in _facts_held(facts) if fact.source != "ai_suggestion"],
+        "conflicts": conflicts,
+    }
+    # Empty lists are left out (shorter prompts); "result" and "where_to_find" are always sent.
+    return _ok("run_rules", {k: v for k, v in content.items() if v or k in ("result", "where_to_find")})
+
+
+def _facts_held(facts) -> list[tuple[str, Any]]:
+    return [(name, getattr(facts, name)) for name in type(facts).model_fields
+            if name != "service_id" and getattr(facts, name).known]
 
 
 def _spec(name: str, description: str, args: type[Args]) -> ToolSpec:
     # The schema is sent with every LLM call, so it is slimmed (shorter prompts, block 5 step 5):
     # pydantic's "title" labels and the length/count limits are left out of the copy the LLM sees.
     # The limits are NOT dropped: Toolbox.run checks every call against the full model (`args`) above.
-    return ToolSpec(name=name, description=description, parameters=_slim(args.model_json_schema()))
+    schema = args.model_json_schema()
+    return ToolSpec(name=name, description=description, parameters=_slim(schema, schema.get("$defs", {})))
 
 
-_NOT_SENT = frozenset({"title", "minLength", "maxLength", "minItems", "maxItems"})
+# Also left out of the copy the LLM sees (approved by Sam on 11 November 2026): "additionalProperties"
+# (extra fields are still refused, Args has extra="forbid") and "default" (the defaults still apply in code).
+_NOT_SENT = frozenset({"title", "minLength", "maxLength", "minItems", "maxItems", "additionalProperties",
+                       "default"})
 
 
-def _slim(node):
+def _slim(node, defs: dict):
     if isinstance(node, dict):
-        return {k: _slim(v) for k, v in node.items() if not (k in _NOT_SENT and not isinstance(v, dict))}
+        if "$ref" in node:  # put the shared part in place: one schema, no "$defs" section
+            return _slim(defs[node["$ref"].rsplit("/", 1)[-1]], defs)
+        options = node.get("anyOf")
+        if isinstance(options, list) and {"type": "null"} in options and len(options) == 2:
+            # "text or null" -> "text": the field is optional anyway (not in "required").
+            other = next(o for o in options if o != {"type": "null"})
+            node = {**{k: v for k, v in node.items() if k != "anyOf"}, **other}
+        return {k: _slim(v, defs) for k, v in node.items()
+                if k != "$defs" and not (k in _NOT_SENT and not isinstance(v, dict))}
     if isinstance(node, list):
-        return [_slim(v) for v in node]
+        return [_slim(v, defs) for v in node]
     return node
 
 
+# Short descriptions: the whole list is sent with every LLM call (approved by Sam on 11 November 2026).
 _TOOLS = [
-    _Tool(_spec("find_service", "Find the bank service a ticket is about, from a few words.", FindServiceArgs),
+    _Tool(_spec("find_service", "Find the service a ticket is about.", FindServiceArgs),
           FindServiceArgs, _find_service),
-    _Tool(_spec("get_service", "One service: critical or important? regulated? The first one looked up becomes "
-                "the incident service.", ServiceArgs), ServiceArgs, _get_service),
-    _Tool(_spec("get_outage_timeline", "Monitoring: when the service went down and came back.", TimelineArgs),
+    _Tool(_spec("get_service", "Critical? Regulated? The first one becomes the incident service.", ServiceArgs),
+          ServiceArgs, _get_service),
+    _Tool(_spec("get_outage_timeline", "Monitoring: outage times.", TimelineArgs),
           TimelineArgs, _get_outage_timeline),
-    _Tool(_spec("get_client_impact", "Client data: affected clients, counterparts, transactions, countries.",
-                WindowArgs), WindowArgs, _get_client_impact),
-    _Tool(_spec("get_daily_averages", "Client data: totals and daily averages to compare the impact against.",
-                ServiceArgs), ServiceArgs, _get_daily_averages),
-    _Tool(_spec("get_security_alerts", "Security alerts: signs of hacking, malicious access or data loss.",
-                AlertArgs), AlertArgs, _get_security_alerts),
-    _Tool(_spec("get_suppliers_for_service", "Supplier register: outside companies that run a service.",
-                ServiceArgs), ServiceArgs, _get_suppliers_for_service),
-    _Tool(_spec("get_supplier", "Supplier register: one supplier by ID.", SupplierArgs), SupplierArgs, _get_supplier),
-    _Tool(_spec("get_supplier_notices", "Messages from a supplier about an incident on its side.", NoticeArgs),
+    _Tool(_spec("get_client_impact", "Affected clients, transactions, countries.", WindowArgs),
+          WindowArgs, _get_client_impact),
+    _Tool(_spec("get_daily_averages", "Client totals and daily averages.", ServiceArgs),
+          ServiceArgs, _get_daily_averages),
+    _Tool(_spec("get_security_alerts", "Security alerts: malicious access, data impact.", AlertArgs),
+          AlertArgs, _get_security_alerts),
+    _Tool(_spec("get_suppliers_for_service", "Suppliers of a service.", ServiceArgs),
+          ServiceArgs, _get_suppliers_for_service),
+    _Tool(_spec("get_supplier", "One supplier.", SupplierArgs), SupplierArgs, _get_supplier),
+    _Tool(_spec("get_supplier_notices", "A supplier's incident notices.", NoticeArgs),
           NoticeArgs, _get_supplier_notices),
-    _Tool(_spec("use_record", "When a lookup returned several records, pick the one about this incident.",
-                UseRecordArgs), UseRecordArgs, _use_record),
-    _Tool(_spec("suggest_facts", "Suggest facts read from the ticket. Not used until a human confirms them.",
-                SuggestArgs), SuggestArgs, _suggest_facts),
-    _Tool(_spec("ask_human", "Queue fixed questions for facts only a human can answer.", AskArgs),
-          AskArgs, _ask_human),
-    _Tool(_spec("run_rules", "Run the DORA rules engine on the facts so far. Returns the result, check_first, "
-                "missing, and where_to_find: for each tool, the missing facts it can supply.", NoArgs),
+    _Tool(_spec("use_record", "Pick one of several records offered.", UseRecordArgs), UseRecordArgs, _use_record),
+    _Tool(_spec("suggest_facts", "Suggest facts from the ticket; a human confirms.", SuggestArgs),
+          SuggestArgs, _suggest_facts),
+    _Tool(_spec("ask_human", "Queue fixed questions for a human.", AskArgs), AskArgs, _ask_human),
+    _Tool(_spec("run_rules", "Rules engine: result, check_first, where_to_find (all missing facts), known.", NoArgs),
           NoArgs, _run_rules),
 ]

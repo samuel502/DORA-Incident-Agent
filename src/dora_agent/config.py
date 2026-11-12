@@ -58,6 +58,10 @@ class LlmSettings:
     rate_limit_max_wait_seconds: int  # most seconds one call may wait on rate limits and connections, in total
     connection_retries: int  # waits and retries on a dropped connection
     tokens_per_minute: int  # pace calls to stay under this; 0 = no pacing
+    reasoning_effort: str = ""  # "low", "medium" or "high" for reasoning models; "" = not sent
+
+
+REASONING_EFFORTS = ("", "low", "medium", "high")
 
 
 @lru_cache(maxsize=1)
@@ -86,10 +90,16 @@ def llm_settings() -> LlmSettings:
         if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
             raise ValueError(f"config.toml [llm] {name} must be a whole number from {low} to {high}")
         limits[name] = value
+    # Groq SDK 1.7.0 (types/chat/completion_create_params.py): "openai/gpt-oss-20b and openai/gpt-oss-120b
+    # support 'low', 'medium', or 'high'. 'medium' is the default value." Empty text = the field is not sent.
+    effort = section.get("reasoning_effort", "")
+    if effort not in REASONING_EFFORTS:
+        raise ValueError('config.toml [llm] reasoning_effort must be "low", "medium", "high" or ""')
     return LlmSettings(
         provider=section["provider"], model=section["model"], api_key_env=section["api_key_env"],
         timeout_seconds=section["timeout_seconds"], max_retries=retries,
-        max_output_tokens=section["max_output_tokens"], temperature=float(temperature), **limits,
+        max_output_tokens=section["max_output_tokens"], temperature=float(temperature),
+        reasoning_effort=effort, **limits,
     )
 
 

@@ -43,6 +43,11 @@ rate_limit_max_wait_seconds = 90
 connection_retries = 2
 # Pace calls to stay under this many tokens per minute (Groq free tier: 8000). 0 = no pacing.
 tokens_per_minute = 8000
+# How much the model reasons before it answers: "low", "medium" or "high" ("" = not sent; Groq then uses
+# the model's default, "medium" for gpt-oss). Reasoning tokens count as output tokens against the limit
+# above. "low" chosen to make runs faster (approved by Sam on 11 November 2026). Checked against the
+# pinned Groq SDK 1.7.0, whose description of the field lists low, medium and high for gpt-oss models.
+reasoning_effort = "low"
 
 [agent]
 # Hard limits on the agent loop (CLAUDE.md hard rule 8). When one is reached, the run stops,

@@ -73,3 +73,37 @@ def test_wait_that_fits_before_the_deadline_goes_ahead():
     pacer.record(900, 0)
     assert pacer.wait_for(500, deadline=t.now + 120) is True
     assert len(t.slept) == 1 and t.slept[0] <= 61
+
+
+# ---------- calibration (approved by Sam on 11 November 2026) ----------
+
+
+def test_estimate_is_scaled_by_the_last_real_count():
+    t = FakeTime()
+    pacer = TokenPacer(8000, clock=t.clock, sleep=t.sleep)
+    pacer.record(1500, 0, estimate=2000)  # Groq counted 75 % of the estimate
+    t.now = 1.0
+    pacer.record(1500, 0, estimate=2000)
+    t.now = 2.0
+    pacer.wait_for(6000)  # 3,000 used + 6,000 x 0.75 = 7,500: fits, no wait (it waited before)
+    assert t.slept == []
+    pacer.wait_for(7000)  # 3,000 + 5,250 > 8,000: still waits
+    assert t.slept
+
+
+def test_calibration_is_kept_within_bounds():
+    t = FakeTime()
+    pacer = TokenPacer(8000, clock=t.clock, sleep=t.sleep)
+    pacer.record(10, 0, estimate=10_000)  # a strange count: at most halves the estimate
+    t.now = 1.0
+    pacer.record(1000, 0)
+    pacer.wait_for(14_200)  # 1,010 + 14,200 x 0.5 = 8,110 > 8,000: waits (0.001 would not)
+    assert t.slept
+
+
+def test_without_an_estimate_nothing_is_calibrated():
+    t = FakeTime()
+    pacer = TokenPacer(8000, clock=t.clock, sleep=t.sleep)
+    pacer.record(4000, 0)
+    pacer.wait_for(4001)  # unchanged behaviour: 8,001 > 8,000
+    assert t.slept

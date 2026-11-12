@@ -466,3 +466,40 @@ def test_pacing_wait_that_would_pass_the_limit_stops_the_call():
         provider.chat(X, [], time_left=20)  # the next call would have to wait about a minute
     assert caught.value.code == "time_limit" and "tokens-per-minute" in str(caught.value)
     assert time.slept == [] and len(client.requests) == 1
+
+
+# ---------- reasoning effort (approved by Sam on 11 November 2026) ----------
+
+from dataclasses import replace as _replace  # noqa: E402
+
+from dora_agent import config as _config  # noqa: E402
+
+
+def test_reasoning_effort_from_config_is_sent():
+    assert llm_settings().reasoning_effort == "low"  # config.toml
+    client = StandInClient(answer("ok"))
+    GroqProvider(llm_settings(), client=client).chat([Message(role="user", content="hi")], [])
+    assert client.requests[-1]["reasoning_effort"] == "low"
+
+
+def test_empty_reasoning_effort_is_not_sent():
+    client = StandInClient(answer("ok"))
+    GroqProvider(_replace(llm_settings(), reasoning_effort=""), client=client).chat(
+        [Message(role="user", content="hi")], [])
+    assert "reasoning_effort" not in client.requests[-1]
+
+
+@pytest.mark.parametrize("value", ["minimal", "LOW", 1, True])
+def test_reasoning_effort_outside_the_fixed_list_is_refused(value, tmp_path, monkeypatch):
+    text = _config.CONFIG_PATH.read_text(encoding="utf-8").replace(
+        'reasoning_effort = "low"', f"reasoning_effort = {json.dumps(value)}")
+    path = tmp_path / "config.toml"
+    path.write_text(text, encoding="utf-8")
+    monkeypatch.setattr(_config, "CONFIG_PATH", path)
+    llm_settings.cache_clear()
+    try:
+        with pytest.raises(ValueError, match="reasoning_effort"):
+            llm_settings()
+    finally:
+        monkeypatch.undo()
+        llm_settings.cache_clear()

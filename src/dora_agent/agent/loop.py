@@ -67,6 +67,9 @@ StopReason = Literal["final_result", "needs_human", "llm_finished", "step_limit"
 HUMAN_TOOLS = frozenset({"ask_human", "suggest_facts"})
 HumanOnly = Literal["not_yet", "ask", "done"]
 
+# What an older full run_rules answer is cut to in the conversation once a newer one arrives.
+OLD_RULES_STUB = {"note": "older run_rules result, replaced by a newer one below"}
+
 
 class RunProblem(ValueError):
     """Bad input to a run (ticket, time, answers). Plain message, safe to show."""
@@ -136,6 +139,7 @@ class AgentRun:
         self._repairing = False  # True right after a refused, unreadable tool call (one retry only)
         self._tool_path: list[str] = []
         self._logged_events = 0
+        self._last_rules_reply: int | None = None  # where the newest full run_rules answer is in _messages
         self._state: Status | None = None
         self._log.write(
             "run_started", ticket=ticket, ticket_sha256=hashlib.sha256(ticket.encode()).hexdigest(),
@@ -310,6 +314,15 @@ class AgentRun:
         return outcome.content
 
     def _reply(self, call: ToolCall, content: dict) -> None:
+        if call.name == "run_rules" and "where_to_find" in content:
+            # A new full run_rules answer replaces the last one, which is cut to a stub (shorter prompts,
+            # approved by Sam on 11 November 2026). The newest full answer always stays: a short "unchanged"
+            # answer refers to it. The decision log is not changed: it has every rules check.
+            if self._last_rules_reply is not None:
+                old = self._messages[self._last_rules_reply]
+                self._messages[self._last_rules_reply] = old.model_copy(
+                    update={"content": tool_message(OLD_RULES_STUB, self._code)})
+            self._last_rules_reply = len(self._messages)
         self._messages.append(Message(role="tool", tool_call_id=call.call_id, content=tool_message(content, self._code)))
 
     def _rules_check(self) -> Classification:

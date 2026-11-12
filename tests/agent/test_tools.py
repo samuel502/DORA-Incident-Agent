@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import pytest
 
 from dora_agent.agent.fact_store import FactStore
-from dora_agent.agent.tools import RunContext, Toolbox
+from dora_agent.agent.tools import UNCHANGED_NOTE, RunContext, Toolbox
 from dora_agent.llm.fake_provider import call
 from dora_agent.llm.provider import ToolCall
 
@@ -291,7 +291,7 @@ def test_attack_confirmation_written_into_the_reason_text_does_nothing():
     assert facts.media_coverage.confirmed_by is None and facts.costs_eur.confirmed_by is None
     assert facts.usable("media_coverage") is None and facts.usable("costs_eur") is None
     outcome = run(box, "run_rules")
-    assert outcome.content["thresholds_met"] == []  # T2 and T6 not counted
+    assert outcome.content.get("thresholds_met", []) == []  # T2 and T6 not counted (empty: left out)
     assert sorted(outcome.content["waiting_for_human"]) == ["costs_eur", "media_coverage"]
 
 
@@ -345,14 +345,14 @@ def test_n01_run_rules_points_at_the_security_alerts_first():
     # Not critical, not regulated: only G-c (RTS-C Art. 6(c)) can still open the gate, so its facts come first.
     assert content["check_first"] == ["malicious_access", "access_on_own_systems"]
     assert content["where_to_find"]["get_security_alerts"][:2] == ["malicious_access", "access_on_own_systems"]
-    assert set(content["check_first"]) <= set(content["missing"])
+    assert set(content["check_first"]) <= set(box.context.last_classification.missing)
 
 
 def test_no_check_first_once_the_gate_is_passed():
     box, _ = box_at()
     run(box, "get_service", service_id="SVC-OLB")  # critical: gate passed (G-a)
     content = run(box, "run_rules").content
-    assert content["check_first"] == []
+    assert "check_first" not in content  # empty lists are left out of the LLM's copy
     assert "get_client_impact" in content["where_to_find"]
 
 
@@ -361,7 +361,9 @@ def test_where_to_find_lists_only_missing_facts():
     run(box, "get_service", service_id="SVC-OLB")
     content = run(box, "run_rules").content
     listed = {fact for facts in content["where_to_find"].values() for fact in facts}
-    assert listed == set(content["missing"])
+    # where_to_find holds every missing fact, so the LLM no longer gets a separate "missing" list.
+    assert listed == set(box.context.last_classification.missing)
+    assert "missing" not in content
 
 
 def test_tool_specs_sent_to_the_llm_are_slim_but_limits_still_apply():
@@ -467,3 +469,83 @@ def test_where_to_find_never_points_at_a_lookup_that_cannot_record_the_fact():
 def test_countries_come_from_client_data_or_a_suggestion():
     # docs/dora-rules.md section 6: "Countries affected | T4 | Client data, supplier register".
     assert WHERE_TO_FIND["affected_member_states"] == ("get_client_impact", "suggest_facts")
+
+
+# ---------- shorter prompts for the free tier (approved by Sam on 11 November 2026) ----------
+
+
+def test_run_rules_answers_briefly_when_no_fact_changed():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    full = run(box, "run_rules").content
+    assert "where_to_find" in full
+    again = run(box, "run_rules").content
+    assert again == {"result": full["result"], "unchanged": True, "note": UNCHANGED_NOTE}
+    run(box, "get_outage_timeline", service_id="SVC-OLB")  # new facts: the full answer comes back
+    assert "where_to_find" in run(box, "run_rules").content
+
+
+def test_run_rules_full_answer_again_after_a_new_suggestion():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    run(box, "run_rules")
+    run(box, "suggest_facts", suggestions=[{"fact": "media_coverage", "value": True, "reason": "in the news"}])
+    content = run(box, "run_rules").content
+    assert content["waiting_for_human"] == ["media_coverage"]  # a suggestion counts as a change
+
+
+def test_run_rules_lists_known_facts_by_name_but_not_suggestions():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    run(box, "suggest_facts", suggestions=[{"fact": "media_coverage", "value": True, "reason": "in the news"}])
+    content = run(box, "run_rules").content
+    assert content["known"] == ["critical_or_important", "regulated_service"]  # names only, no values
+    assert "media_coverage" not in content["known"]
+
+
+def test_run_rules_leaves_out_missing_summary_and_empty_lists():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    content = run(box, "run_rules").content
+    assert set(content) == {"result", "where_to_find", "known"}  # nothing else is set yet
+    assert box.context.last_classification.missing  # the full list is still held by the code
+
+
+def test_lookup_results_for_the_llm_have_no_source_method_event_ids_or_nulls():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    texts = [json.dumps(run(box, name, **args).content) for name, args in [
+        ("get_outage_timeline", {"service_id": "SVC-OLB"}),
+        ("get_client_impact", {"service_id": "SVC-OLB", **C01_WINDOW}),
+        ("get_daily_averages", {"service_id": "SVC-OLB"})]]
+    for text in texts:
+        assert '"source"' not in text and '"method"' not in text and '"event_id"' not in text
+        assert "null" not in text
+    assert "PRB-0002" in texts[0] and "IMP-0001" in texts[1]  # the record IDs the LLM may need stay
+
+
+def test_facts_from_a_lookup_still_say_where_they_came_from():
+    box, store = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    run(box, "get_client_impact", service_id="SVC-OLB", **C01_WINDOW)
+    assert store.snapshot().affected_clients.source == "client_data"  # hard rule 9: the log keeps the source
+
+
+def test_tool_schemas_sent_are_flat_but_extra_fields_are_still_refused():
+    box, _ = box_at(C01_REPORTED)
+    for spec in box.specs():
+        keys = set(_all_keys(spec.parameters))
+        assert not keys & {"additionalProperties", "default", "$defs", "$ref"}, spec.name
+        assert '{"type": "null"}' not in json.dumps(spec.parameters), spec.name
+    suggest = next(s for s in box.specs() if s.name == "suggest_facts")
+    assert suggest.parameters["properties"]["suggestions"]["items"]["required"] == ["fact", "value", "reason"]
+    outcome = run(box, "suggest_facts", suggestions=[{"fact": "media_coverage", "value": True, "reason": "x",
+                                                      "confirmed_by": "Sam"}])
+    assert not outcome.ok and outcome.error.startswith("invalid arguments")
+
+
+def test_tool_list_sent_with_every_call_stays_short():
+    from dora_agent.llm.groq_provider import _tool_to_wire
+    from dora_agent.llm.pacing import estimate_tokens
+    box, _ = box_at(C01_REPORTED)
+    assert estimate_tokens([_tool_to_wire(s) for s in box.specs()]) <= 1100  # was 1,331 before the cut
