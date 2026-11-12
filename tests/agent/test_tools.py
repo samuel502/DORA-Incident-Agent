@@ -384,3 +384,86 @@ def test_instructions_ask_for_batched_lookups_and_keep_the_checklist():
 def test_instructions_say_to_start_from_alerts_when_no_service_is_named():
     # Sam, block 5 step 5 (6b): B03's ticket names no service; the brief says that path starts with the alerts.
     assert "If the ticket names no service, check security alerts and monitoring first" in SYSTEM_PROMPT
+
+
+# ---------- C01 live test fixes (approved by Sam on 11 November 2026) ----------
+
+C01_REPORTED = datetime(2025, 2, 15, 21, 0, tzinfo=UTC)
+C01_WINDOW = {"start": "2025-02-15T00:00:00Z", "end": "2025-02-16T23:59:59Z"}
+
+
+def test_lookup_before_get_service_is_marked_not_remembered_and_not_counted_as_done():
+    box, store = box_at(C01_REPORTED)
+    early = run(box, "get_client_impact", service_id="SVC-OLB", **C01_WINDOW)
+    assert early.ok and early.facts_recorded == () and early.before_service
+    assert "call get_service first" in early.content["note"]
+    assert not box.context.remembered and not box.context.lookups_done
+
+    run(box, "get_service", service_id="SVC-OLB")
+    again = run(box, "get_client_impact", service_id="SVC-OLB", **C01_WINDOW)  # the very same call
+    assert not again.repeat and not again.before_service  # it runs again instead of coming from memory
+    assert set(again.facts_recorded) >= {"affected_clients", "affected_member_states"}
+    assert store.snapshot().affected_clients.value == 520000  # IMP-0001
+    assert box.context.lookup_done("get_client_impact")
+
+
+@pytest.mark.parametrize("name", ["get_outage_timeline", "get_daily_averages"])
+def test_other_service_bound_lookups_before_get_service_record_nothing_and_are_not_remembered(name):
+    box, store = box_at(C01_REPORTED)
+    early = run(box, name, service_id="SVC-OLB")
+    assert early.before_service and early.facts_recorded == ()
+    assert "call get_service first" in early.content["note"]
+    assert not box.context.remembered
+    run(box, "get_service", service_id="SVC-OLB")
+    assert run(box, name, service_id="SVC-OLB").facts_recorded  # now it records
+
+
+def test_lookups_after_get_service_are_still_remembered():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    first = run(box, "get_client_impact", service_id="SVC-OLB", **C01_WINDOW)
+    assert not first.before_service
+    assert run(box, "get_client_impact", service_id="SVC-OLB", **C01_WINDOW).repeat  # the repeat guard still works
+
+
+def test_ask_human_queues_the_facts_with_a_question_and_lists_the_others():
+    box, _ = box_at(C01_REPORTED)
+    outcome = run(box, "ask_human", facts=["total_counterparts", "media_coverage", "affected_tx_count",
+                                           "costs_eur", "affected_tx_value_eur", "affected_member_states"])
+    assert outcome.ok
+    assert box.context.pending_questions == ["media_coverage", "costs_eur"]
+    assert outcome.content["no_fixed_question"] == ["total_counterparts", "affected_tx_count",
+                                                    "affected_tx_value_eur", "affected_member_states"]
+    assert "suggest_facts" in outcome.content["no_fixed_question_note"]
+    # Fact names with no question are never queued, and never become questions.
+    assert set(box.context.asked) == {"media_coverage", "costs_eur"}
+
+
+def test_ask_human_with_only_facts_without_a_question_is_still_refused():
+    box, _ = box_at(C01_REPORTED)
+    outcome = run(box, "ask_human", facts=["total_counterparts", "affected_tx_count"])
+    assert not outcome.ok
+    assert outcome.error == "no fixed question for: total_counterparts, affected_tx_count"
+    assert box.context.pending_questions == []
+
+
+def test_ask_human_lists_long_unknown_names_cut_short():
+    box, _ = box_at(C01_REPORTED)
+    outcome = run(box, "ask_human", facts=["media_coverage", "x" * 60])
+    assert outcome.content["no_fixed_question"] == ["x" * 60]
+
+
+# Tools that never turn their result into facts (mapping.py: supplier data and service search).
+_NO_FACT_TOOLS = {"find_service", "get_suppliers_for_service", "get_supplier", "get_supplier_notices"}
+
+
+def test_where_to_find_never_points_at_a_lookup_that_cannot_record_the_fact():
+    # The human-only check waits for every system tool named here. A tool that never records facts would
+    # make it wait for nothing (C01 live test: affected_member_states and the supplier register).
+    for fact, names in WHERE_TO_FIND.items():
+        assert not set(names) & _NO_FACT_TOOLS, fact
+
+
+def test_countries_come_from_client_data_or_a_suggestion():
+    # docs/dora-rules.md section 6: "Countries affected | T4 | Client data, supplier register".
+    assert WHERE_TO_FIND["affected_member_states"] == ("get_client_impact", "suggest_facts")

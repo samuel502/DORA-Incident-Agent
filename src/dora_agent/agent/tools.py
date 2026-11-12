@@ -117,6 +117,9 @@ class ToolOutcome(BaseModel):
     facts_recorded: tuple[str, ...] = ()
     error: str | None = None
     repeat: bool = False  # True if this was a repeated identical lookup, answered from memory
+    # True if a lookup that records facts only for the incident service ran before that service was known,
+    # so it recorded nothing. Logged, so an "ok" with no facts can be told apart in the decision log.
+    before_service: bool = False
 
 
 @dataclass
@@ -194,6 +197,8 @@ class Toolbox:
             self.context.repeats += 1
             return ToolOutcome(tool=call.name, ok=True, repeat=True,
                                content={**self.context.remembered[key], "note": REPEAT_NOTE})
+        # Checked before the handler runs: get_service is the only tool that sets the incident service.
+        before_service = call.name in SERVICE_BOUND and self.context.incident_service is None
         try:
             outcome = tool.handler(self, args)
         except (InvalidQuery, ValueProblem) as problem:
@@ -201,6 +206,11 @@ class Toolbox:
         text = json.dumps(outcome.content, default=str)
         if len(text) > self._max_result_chars:
             return _refused(call.name, "result too large; narrow the search")
+        if before_service:
+            # Bug fix (C01 live test, approved by Sam on 11 November 2026): this result recorded nothing
+            # only because the service was not known yet. So it is not remembered and does not count as
+            # done: the same call after get_service runs again and records the facts.
+            return outcome.model_copy(update={"before_service": True})
         if outcome.ok and call.name in LOOKUPS:
             self.context.lookups_done.add((call.name, getattr(args, "service_id", None)))
             if key is not None:
@@ -226,7 +236,7 @@ class Toolbox:
                         mapper: Callable[[FactStore, Any], list[str]], may_record: bool) -> tuple[list[str], str]:
         """One matching record: adopt it. Several: offer them; the LLM picks one with use_record."""
         if not may_record:
-            return [], "information only: facts are recorded only for the incident service (call get_service first)"
+            return [], NOT_YET_NOTE
         if kind in self.context.adopted:
             return [], f"information only: a {kind} record ({self.context.adopted[kind]}) is already in use"
         if len(records) == 1:
@@ -246,6 +256,10 @@ LOOKUPS = frozenset({
     "find_service", "get_service", "get_outage_timeline", "get_client_impact", "get_daily_averages",
     "get_security_alerts", "get_suppliers_for_service", "get_supplier", "get_supplier_notices",
 })
+# Lookups that record facts only for the incident service (see _offer_or_adopt and _get_daily_averages).
+# Security alerts are not here: they may be used before the service is known (case B03).
+SERVICE_BOUND = frozenset({"get_outage_timeline", "get_client_impact", "get_daily_averages"})
+NOT_YET_NOTE = "information only: facts are recorded only for the incident service (call get_service first)"
 REPEAT_NOTE = ("repeated call: same result as before, nothing new. Choose another tool from where_to_find, "
                "or ask_human.")
 
@@ -305,6 +319,8 @@ def _get_client_impact(box: Toolbox, args: WindowArgs) -> ToolOutcome:
 def _get_daily_averages(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
     # The date is chosen by plain code, not the LLM: the incident's earliest known time, else the reported time.
     result = connectors.get_daily_averages(args.service_id, _daily_averages_date(box))
+    if box.context.incident_service is None:
+        return _ok("get_daily_averages", _dump(result), note=NOT_YET_NOTE)
     if not box._is_incident_service(args.service_id):
         return _ok("get_daily_averages", _dump(result), note="information only: not the incident service")
     return _ok("get_daily_averages", _dump(result), mapping.map_daily_averages(box._store, result))
@@ -368,21 +384,32 @@ def _suggest_facts(box: Toolbox, args: SuggestArgs) -> ToolOutcome:
 
 
 def _ask_human(box: Toolbox, args: AskArgs) -> ToolOutcome:
-    unknown = [f[:60] for f in args.facts if f not in QUESTIONS]
-    if unknown:
+    # Bug fix (C01 live test, approved by Sam on 11 November 2026): facts with a fixed question are queued
+    # even if the same call also names facts without one. Those are listed back, never asked.
+    names = list(dict.fromkeys(args.facts))
+    unknown = [f[:60] for f in names if f not in QUESTIONS]
+    askable = [f for f in names if f in QUESTIONS]
+    if not askable:
         return _refused("ask_human", f"no fixed question for: {', '.join(unknown)}")
-    for name in args.facts:
+    for name in askable:
         if name not in box.context.pending_questions:
             box.context.queue_question(name)
     pending = box.context.pending_questions
-    already = [n for n in dict.fromkeys(args.facts) if n in box.context.asked and n not in pending]
+    already = [n for n in askable if n in box.context.asked and n not in pending]
     content = {"queued": [QUESTIONS[n].text for n in box.context.pending_questions],
                "note": "the run pauses here; the human answers these and reviews all suggestions"}
     if already:
         content["already_asked"] = already  # never asked twice in one run
+    if unknown:
+        content["no_fixed_question"] = unknown
+        content["no_fixed_question_note"] = NO_QUESTION_NOTE
     if not box.context.pending_questions:
         content["note"] = "nothing new to ask: these were already asked in this run"
     return _ok("ask_human", content)
+
+
+NO_QUESTION_NOTE = ("not asked: no fixed question exists. These come only from a bank system, or from the "
+                    "ticket with suggest_facts.")
 
 
 # Where the agent can find each fact: docs/dora-rules.md section 6, "Where Rheinbank keeps it".
@@ -417,7 +444,10 @@ WHERE_TO_FIND: dict[str, tuple[str, ...]] = {
     "downtime_start": ("get_outage_timeline",),  # monitoring
     "service_restored_at": ("get_outage_timeline",),
     "backlog_cleared_at": ("get_outage_timeline",),
-    "affected_member_states": ("get_client_impact", "get_suppliers_for_service"),  # client data, supplier register
+    # Client data, supplier register (section 6). Supplier data is never turned into facts (mapping.py), so
+    # the register feeds a suggestion: get_suppliers_for_service, then suggest_facts. Pointing at the register
+    # tool itself made the human-only check wait for a lookup that can never record this fact (C01 live test).
+    "affected_member_states": ("get_client_impact", "suggest_facts"),
     "data_availability_impact": _ALERTS_THEN_HUMAN,  # T5-a: security alerts, human confirms
     "data_authenticity_impact": _ALERTS_THEN_HUMAN,
     "data_integrity_impact": _ALERTS_THEN_HUMAN,

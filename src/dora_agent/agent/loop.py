@@ -255,19 +255,27 @@ class AgentRun:
                 return self._settle()  # the LLM thinks it is done
 
             limit_hit = time_hit = False
-            for index, call in enumerate(response.tool_calls):
+            calls = response.tool_calls
+            replies: dict[int, dict] = {}
+            # Bug fix (C01 live test, approved by Sam on 11 November 2026): get_service runs first in an
+            # answer, because lookups only record facts for the incident service, which get_service sets.
+            # The other calls keep the order the LLM gave. The replies still go back in the LLM's order.
+            for index in sorted(range(len(calls)), key=lambda i: calls[i].name != "get_service"):
+                call = calls[index]
                 if time_hit or self._time_left() <= 0:
                     time_hit = True
-                    self._reply(call, {"error": "not run: time limit for this run reached"})
+                    replies[index] = {"error": "not run: time limit for this run reached"}
                     continue
                 if self._tool_calls >= limits.max_tool_calls:
                     limit_hit = True
-                    self._reply(call, {"error": "not run: tool call limit for this run reached"})
+                    replies[index] = {"error": "not run: tool call limit for this run reached"}
                     continue
                 if index >= limits.max_tool_calls_per_step:
-                    self._reply(call, {"error": "not run: too many tool calls in one step"})
+                    replies[index] = {"error": "not run: too many tool calls in one step"}
                     continue
-                self._run_tool(call, by="llm")
+                replies[index] = self._run_tool(call, by="llm")
+            for index, call in enumerate(calls):
+                self._reply(call, replies[index])
             if time_hit:
                 return self._end("stopped", "time_limit")
             if limit_hit:
@@ -288,7 +296,8 @@ class AgentRun:
             if only_human == "done":
                 return self._end("finished", "no_more_sources")
 
-    def _run_tool(self, call: ToolCall, by: str) -> None:
+    def _run_tool(self, call: ToolCall, by: str) -> dict:
+        """Run one tool call and log it. Returns what goes back to the LLM; the caller sends it."""
         outcome = self._toolbox.run(call)
         self._tool_calls += 1  # a repeat answered from memory counts too
         label = (call.name[:60] + ("" if by == "llm" else f" ({by})") + (" (repeat)" if outcome.repeat else "")
@@ -296,10 +305,9 @@ class AgentRun:
         self._tool_path.append(label)
         self._log.write("tool_call", by=by, tool=call.name[:60], arguments=call.arguments,
                         ok=outcome.ok, error=outcome.error, facts_recorded=list(outcome.facts_recorded),
-                        repeat=outcome.repeat)
+                        repeat=outcome.repeat, before_service=outcome.before_service)
         self._log_new_events()
-        if by == "llm":
-            self._reply(call, outcome.content)
+        return outcome.content
 
     def _reply(self, call: ToolCall, content: dict) -> None:
         self._messages.append(Message(role="tool", tool_call_id=call.call_id, content=tool_message(content, self._code)))

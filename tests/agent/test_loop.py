@@ -661,3 +661,68 @@ def test_time_waiting_for_a_person_does_not_count():
                         review=human.review(paused.review_items))
     assert result.stop_reason != "time_limit"
     assert result.seconds_used == 20.0 * result.steps_used  # the 10,000 s wait is not counted
+
+
+# ---------- C01 live test fixes (approved by Sam on 11 November 2026) ----------
+
+C01_TICKET = ("Since the platform migration on Saturday night (15 Feb, 22:00), customers can't log into online "
+              "or mobile banking and payments fail. Call centre queues are over an hour.")
+C01_WINDOW = {"start": "2025-02-15T00:00:00Z", "end": "2025-02-16T23:59:59Z"}
+
+
+def _tool_reply_ids(messages):
+    return [m.tool_call_id for m in messages if m.role == "tool"]
+
+
+def test_get_service_runs_first_in_an_answer_but_replies_keep_the_llm_order():
+    fake = FakeProvider([
+        many(call("get_client_impact", service_id="SVC-OLB", **C01_WINDOW),
+             call("get_outage_timeline", service_id="SVC-OLB"),
+             call("get_daily_averages", service_id="SVC-OLB"),
+             call("get_service", service_id="SVC-OLB")),
+        say("done"),
+    ])
+    result = AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    assert result.tool_path == ("get_service", "get_client_impact", "get_outage_timeline", "get_daily_averages")
+    # C01: with the facts recorded, the rules engine says major at once, with no question to the human.
+    assert (result.status, result.stop_reason, result.classification.result) == ("finished", "final_result", "major")
+    assert result.questions == ()
+    assert len(fake.calls) == 1
+
+
+def test_tool_replies_follow_the_order_of_the_llm_calls():
+    fake = FakeProvider([
+        many(call("get_security_alerts", service_id="SVC-OLB", **C01_WINDOW), call("get_service", service_id="SVC-OLB")),
+        say("done"),
+    ])
+    AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    assert _tool_reply_ids(fake.calls[1][0]) == ["c0", "c1"]
+
+
+def test_c01_lookup_repeated_after_get_service_records_the_facts():
+    # The live run's trap: the early call recorded nothing, and the repeat came back from memory, empty.
+    fake = FakeProvider([
+        call("get_client_impact", service_id="SVC-OLB", **C01_WINDOW),
+        call("get_service", service_id="SVC-OLB"),
+        many(call("get_client_impact", service_id="SVC-OLB", **C01_WINDOW),
+             call("get_outage_timeline", service_id="SVC-OLB"),
+             call("get_daily_averages", service_id="SVC-OLB")),
+        say("done"),
+    ])
+    result = AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    assert result.classification.result == "major"
+    assert result.classification.facts.affected_clients.value == 520000
+    calls = [r for r in result.trace if r["kind"] == "tool_call" and r["tool"] == "get_client_impact"]
+    assert [(r["before_service"], r["repeat"], bool(r["facts_recorded"])) for r in calls] == [
+        (True, False, False), (False, False, True)]
+
+
+def test_ask_human_with_mixed_facts_pauses_for_the_ones_with_questions():
+    fake = FakeProvider([
+        call("get_service", service_id="SVC-OLB"),
+        call("ask_human", facts=["total_counterparts", "media_coverage", "affected_tx_count"]),
+    ])
+    paused = AgentRun(C01_TICKET, t("2025-02-15T21:00:00Z"), fake).start()
+    assert paused.status == "needs_human"
+    assert [q.fact_name for q in paused.questions] == ["media_coverage"]
+    assert paused.tool_path == ("get_service", "ask_human")  # not refused
