@@ -32,7 +32,7 @@ from typing import Any
 
 from dora_agent.agent.fact_store import ReviewDecision, ReviewItem
 from dora_agent.agent.loop import AgentRun, PendingQuestion, RunResult
-from dora_agent.agent.questions import QUESTIONS, interpret_answer
+from dora_agent.agent.questions import QUESTIONS, SERVICE_QUESTION, interpret_answer
 from dora_agent.config import PROJECT_ROOT, AgentLimits
 from dora_agent.llm.provider import LlmProvider
 from dora_agent.rules import Classification
@@ -78,8 +78,10 @@ def load_scenarios(path: Path = INDEX_PATH) -> list[Scenario]:
 class ScriptedHuman:
     """Answers the agent's fixed questions and reviews ticket suggestions from one scenario's answer key."""
 
-    def __init__(self, answers: dict[str, Any]):
+    def __init__(self, answers: dict[str, Any], service_id: str | None = None):
         self._answers = answers
+        # The scenario's service: what a person at the bank would pick if asked which service to classify.
+        self._service_id = service_id
 
     def _key(self, fact_name: str) -> tuple[Any, bool] | None:
         """(answer, is_estimate) from the key, or None if the key says nothing."""
@@ -94,6 +96,10 @@ class ScriptedHuman:
         answers: dict[str, Any] = {}
         estimates: set[str] = set()
         for question in questions:
+            if question.fact_name == SERVICE_QUESTION:
+                if self._service_id in (question.choices or ()):
+                    answers[SERVICE_QUESTION] = self._service_id
+                continue  # not one of the choices: left unanswered
             key = self._key(question.fact_name)
             if key is None:
                 if question.choices:  # yes / no / unsure
@@ -186,7 +192,7 @@ class CaseOutcome:
 
 def run_case(scenario: Scenario, provider: LlmProvider, *, as_of: datetime = AS_OF,
              limits: AgentLimits | None = None, log_dir: Path | None = None) -> CaseOutcome:
-    human = ScriptedHuman(scenario.human_answers)
+    human = ScriptedHuman(scenario.human_answers, scenario.service_id)
     run = AgentRun(scenario.ticket, scenario.around, provider, as_of=as_of, limits=limits, log_dir=log_dir)
     asked: list[str] = []
     review_log: list[str] = []

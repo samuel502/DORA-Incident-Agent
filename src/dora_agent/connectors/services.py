@@ -31,11 +31,15 @@ def _matches(query: str, candidate: str) -> bool:
     'online banking is down' matches the alias 'online banking'.
     'banking' matches the alias 'online banking' (query of 3+ characters inside an alias).
     'application' does not match the alias 'app' (whole words only).
+    'online or mobile banking' matches 'online banking' AND 'mobile banking': every word of the alias
+    is in the text, even if other words sit between them (C01 live test, approved by Sam).
     """
     if not query or not candidate:
         return False
     padded_query, padded_candidate = f" {query} ", f" {candidate} "
-    return padded_candidate in padded_query or (len(query) >= 3 and padded_query in padded_candidate)
+    if padded_candidate in padded_query or (len(query) >= 3 and padded_query in padded_candidate):
+        return True
+    return set(candidate.split()) <= set(query.split())
 
 
 def find_service(text: object) -> FindServiceResult:

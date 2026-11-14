@@ -11,22 +11,28 @@ What each kind of tool may change (security framework, section 2):
   and only for the incident's own service.
 - suggest_facts: writes suggestions only, through AgentFactView. Never confirms anything.
 - ask_human: only queues fixed questions (questions.py). It cannot answer them.
-- run_rules: runs the rules engine. It is the only source of the classification (hard rule 1).
+
+What the LLM sees (C01 live test, approved by Sam on 13 November 2026): the bank lookups are not offered one by
+one. The LLM lists the lookups it wants in ONE `lookups` call (the model made one tool call per answer even with
+parallel calls switched on), and the loop runs each of them through `Toolbox.run`, checked like any other call.
+The LLM still chooses every lookup and its arguments. run_rules is no longer a tool: after every step, plain
+code runs the rules engine and adds a short status (`status` below). The engine is the only source of the
+classification (hard rule 1).
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Callable
+from datetime import datetime, timedelta
+from typing import Any, Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from dora_agent import connectors
 from dora_agent.agent import mapping
 from dora_agent.agent.fact_store import FactStore
-from dora_agent.agent.questions import QUESTIONS
+from dora_agent.agent.questions import QUESTIONS, SERVICE_QUESTION, SERVICE_QUESTION_TEXT
 from dora_agent.agent.values import ValueProblem
 from dora_agent.config import agent_limits
 from dora_agent.connectors import InvalidQuery
@@ -47,10 +53,6 @@ class Args(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
 
-class NoArgs(Args):
-    pass
-
-
 class FindServiceArgs(Args):
     text: str = Field(min_length=1, max_length=100, description="A few words from the ticket")
 
@@ -66,10 +68,15 @@ class TimelineArgs(Args):
     window_hours: int = Field(default=24, ge=1, le=72)
 
 
-class WindowArgs(Args):
+class ImpactArgs(Args):
+    """Window hardening (approved by Sam on 13 November 2026): start and end may be left out. Code then uses
+    the known outage times (see _impact_window), so the search window follows the incident."""
+
     service_id: str = ServiceId
-    start: str = TimeText
-    end: str = TimeText
+    start: str | None = Field(default=None, min_length=1, max_length=40,
+                              description="ISO 8601 with zone. Leave out: code uses the known incident start")
+    end: str | None = Field(default=None, min_length=1, max_length=40,
+                            description="ISO 8601 with zone. Leave out: code uses the known restore time")
 
 
 class AlertArgs(Args):
@@ -106,6 +113,22 @@ class AskArgs(Args):
     facts: list[str] = Field(min_length=1, max_length=20, description="Fact names")
 
 
+# The read-only bank lookups the LLM may list in one `lookups` call.
+LookupName = Literal["find_service", "get_service", "get_outage_timeline", "get_client_impact",
+                     "get_daily_averages", "get_security_alerts", "get_suppliers_for_service", "get_supplier",
+                     "get_supplier_notices"]
+
+
+class LookupItem(Args):
+    tool: LookupName
+    args: dict[str, Any] = Field(description="That lookup's arguments, see the tool description")
+
+
+class LookupsArgs(Args):
+    # The per-answer limit (config.toml [agent] max_tool_calls_per_step) is applied by the loop, per lookup.
+    calls: list[LookupItem] = Field(min_length=1, max_length=20)
+
+
 class ToolOutcome(BaseModel):
     """What one tool call did. `content` goes back to the LLM (as untrusted data); the rest goes to the log."""
 
@@ -134,6 +157,8 @@ class RunContext:
     pending_questions: list[str] = field(default_factory=list)
     last_classification: Classification | None = None
     alerts_checked: bool = False  # used by the gate check in loop.py
+    # Services find_service returned in this run (ID -> name), the only choices of the service question.
+    candidates: dict[str, str] = field(default_factory=dict)
     # Block 5 step 5 (approved by Sam): never ask the same question twice in one run.
     asked: set[str] = field(default_factory=set)
     # Lookups that ran successfully: (tool, service_id or None). Used to tell when only a human can help.
@@ -141,9 +166,9 @@ class RunContext:
     # Earlier results of read-only lookups, by tool and exact arguments (repeated calls).
     remembered: dict[str, dict[str, Any]] = field(default_factory=dict)
     repeats: int = 0
-    # The facts (and conflicts) the LLM's last FULL run_rules answer was based on. If nothing changed since,
-    # run_rules answers briefly (block 6, C01 live test, approved by Sam on 11 November 2026).
-    rules_seen: str | None = None
+    # The facts (and conflicts) the LLM's last FULL status was based on. If nothing changed since, the status
+    # is short (block 6, C01 live test, approved by Sam on 11 November 2026).
+    status_seen: str | None = None
 
     def queue_question(self, name: str) -> bool:
         """Queue a fixed question unless it was already asked in this run. True if it was queued."""
@@ -170,20 +195,43 @@ class _Tool:
 
 
 class Toolbox:
-    def __init__(self, store: FactStore, context: RunContext, max_result_chars: int | None = None):
+    def __init__(self, store: FactStore, context: RunContext, max_result_chars: int | None = None,
+                 impact_default_days: int | None = None):
         self._store = store
         self._view = store.agent_view()  # the only way suggestions get in
         self.context = context
         # Longest tool result (as JSON text) sent back to the LLM: config.toml [agent].
         self._max_result_chars = max_result_chars or agent_limits().max_tool_result_chars
+        # get_client_impact without a window: days around the reported time if outage times are not known.
+        self.impact_default_days = impact_default_days or agent_limits().client_impact_default_days
         self._tools = {tool.spec.name: tool for tool in _TOOLS}
 
     def specs(self) -> list[ToolSpec]:
-        return [tool.spec for tool in self._tools.values()]
+        """What the LLM is offered: one `lookups` tool for all bank lookups, plus use_record, suggest_facts
+        and ask_human. The single lookups stay callable (by name, checked the same way), but are not listed."""
+        return [LOOKUPS_SPEC] + [self._tools[name].spec for name in OFFERED]
+
+    def expand(self, call: ToolCall) -> list[ToolCall] | ToolOutcome:
+        """Turn one `lookups` call into the single lookups it lists, or a refusal if it is malformed.
+
+        Only the outer shape is checked here; each lookup's own arguments are checked by `run`, like any call.
+        """
+        if not call.arguments_valid:
+            return _refused("lookups", "arguments are not a JSON object")
+        try:
+            args = LookupsArgs.model_validate(call.arguments)
+        except ValidationError as error:
+            fields = sorted({".".join(str(p) for p in e["loc"]) or "arguments" for e in error.errors()})
+            return _refused("lookups", f"invalid arguments: {', '.join(fields)[:200]}")
+        return [ToolCall(call_id=f"{call.call_id}-{i}", name=item.tool, arguments=item.args,
+                         raw_arguments=json.dumps(item.args, default=str)[:500])
+                for i, item in enumerate(args.calls)]
 
     def run(self, call: ToolCall) -> ToolOutcome:
         tool = self._tools.get(call.name)
         if tool is None:
+            if call.name == "run_rules":
+                return _refused("run_rules", RUN_RULES_GONE)
             return _refused(call.name[:60], "unknown tool")
         if not call.arguments_valid:
             return _refused(call.name, "arguments are not a JSON object")
@@ -265,6 +313,12 @@ SERVICE_BOUND = frozenset({"get_outage_timeline", "get_client_impact", "get_dail
 NOT_YET_NOTE = "information only: facts are recorded only for the incident service (call get_service first)"
 REPEAT_NOTE = ("repeated call: same result as before, nothing new. Choose another tool from where_to_find, "
                "or ask_human.")
+RUN_RULES_GONE = ("run_rules is not a tool: the rules engine runs after every step, and its result comes to you "
+                  "as the status")
+# Run order inside one answer (loop.py): get_service first, because lookups only record facts for the incident
+# service, which get_service sets (C01 live test, 11 November 2026). Then the outage timeline, so a client
+# impact search without a window can follow the outage times it records (13 November 2026). Then the rest.
+RUN_FIRST = {"get_service": 0, "get_outage_timeline": 1}
 
 
 def _refused(tool: str, reason: str) -> ToolOutcome:
@@ -302,8 +356,18 @@ def _for_llm(node):
 # ---------- handlers: bank systems (read-only) ----------
 
 
+SEVERAL_NOTE = ("several services match. Before get_service, check each of them in one lookups call "
+                "(get_outage_timeline and get_client_impact for each). Then call get_service for the service whose "
+                "records show this incident. If the records do not tell them apart, call ask_human with "
+                f'["{SERVICE_QUESTION}"].')
+
+
 def _find_service(box: Toolbox, args: FindServiceArgs) -> ToolOutcome:
-    return _ok("find_service", _dump(connectors.find_service(args.text)))
+    result = connectors.find_service(args.text)
+    for match in result.matches:
+        box.context.candidates.setdefault(match.service_id, match.name)
+    several = len(result.matches) > 1 and box.context.incident_service is None
+    return _ok("find_service", _dump(result), note=SEVERAL_NOTE if several else None)
 
 
 def _get_service(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
@@ -328,11 +392,60 @@ def _get_outage_timeline(box: Toolbox, args: TimelineArgs) -> ToolOutcome:
     return _ok("get_outage_timeline", _dump(result), recorded, note)
 
 
-def _get_client_impact(box: Toolbox, args: WindowArgs) -> ToolOutcome:
-    result = connectors.get_client_impact(args.service_id, args.start, args.end)
+def _get_client_impact(box: Toolbox, args: ImpactArgs) -> ToolOutcome:
+    start, end = _impact_window(box, args)
+    result = connectors.get_client_impact(args.service_id, start, end)
     recorded, note = box._offer_or_adopt("client_impact", list(result.impacts), lambda i: i.impact_id,
                                          mapping.map_impact, box._is_incident_service(args.service_id))
-    return _ok("get_client_impact", _dump(result), recorded, note)
+    content = _dump(result)
+    if args.start is None or args.end is None:
+        # The window code chose, so the LLM and the decision log can see where it looked.
+        content["window_used"] = {"start": _iso(start), "end": _iso(end)}
+    return _ok("get_client_impact", content, recorded, note)
+
+
+# The longest window get_client_impact accepts (config.toml [connectors] max_impact_window_days is 366).
+_MAX_DEFAULT_WINDOW = timedelta(days=366)
+
+
+def _iso(value: Any) -> str:
+    return value.isoformat() if isinstance(value, datetime) else str(value)
+
+
+def _impact_window(box: Toolbox, args: ImpactArgs) -> tuple[Any, Any]:
+    """The search window: what the LLM gave, else the known outage times (window hardening, Sam, 13 Nov 2026).
+
+    Start: the earliest known of incident start and downtime start. End: the latest known of service restored
+    and resolved. If one is not known yet: the reported time minus client_impact_default_days, or the later of
+    the reported time and the time of the check plus that many days. Plain code; it only picks where to look,
+    never what a record means. A window the LLM gives is used as it is (the connector checks it).
+    """
+    facts = box._store.snapshot()
+    days = timedelta(days=box.impact_default_days)
+    starts = [t for t in (facts.usable("incident_start"), facts.usable("downtime_start")) if t is not None]
+    ends = [t for t in (facts.usable("service_restored_at"), facts.usable("resolved_at")) if t is not None]
+    if args.start is not None:
+        start = args.start
+    else:
+        start = min(starts) if starts else box.context.reported_at - days
+    if args.end is not None:
+        return start, args.end
+    end = max(ends) if ends else max(box.context.reported_at, box.context.as_of) + days
+    begin = _as_time(start)  # a start the LLM gave is text; if it is not a valid time, the connector refuses it
+    if begin is not None:
+        # Never empty, never longer than the connector allows (a record overlapping the start is still found).
+        end = min(max(end, begin + timedelta(hours=1)), begin + _MAX_DEFAULT_WINDOW)
+    return start, end
+
+
+def _as_time(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
 
 
 def _get_daily_averages(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
@@ -391,40 +504,73 @@ def _use_record(box: Toolbox, args: UseRecordArgs) -> ToolOutcome:
 # ---------- handlers: suggestions, questions, rules ----------
 
 
+HELD_NOTE = "refused: already known from a system or a person (see known in the status)"
+
+
 def _suggest_facts(box: Toolbox, args: SuggestArgs) -> ToolOutcome:
-    results = []
+    results, refused = [], []
     for s in args.suggestions:
+        if box._store.has_value(s.fact):
+            # Already held from a system or a person: refused before anything is stored (approved by Sam on
+            # 13 November 2026). The fact store would ignore it too; this says so plainly.
+            refused.append(s.fact[:60])
+            continue
         try:
             results.append(box._view.suggest(s.fact, s.value, s.reason))
         except ValueProblem as problem:
             results.append(f"{s.fact[:60]}: not stored ({problem})")
-    return _ok("suggest_facts", {"results": results,
-                                 "note": "suggestions are not used until a human confirms them in one review"})
+    if not results:
+        return _refused("suggest_facts", f"{HELD_NOTE}: {', '.join(refused)}"[:300])
+    content = {"results": results, "note": "suggestions are not used until a human confirms them in one review"}
+    if refused:
+        content["refused"] = refused
+        content["refused_note"] = HELD_NOTE
+    return _ok("suggest_facts", content)
 
 
 def _ask_human(box: Toolbox, args: AskArgs) -> ToolOutcome:
     # Bug fix (C01 live test, approved by Sam on 11 November 2026): facts with a fixed question are queued
     # even if the same call also names facts without one. Those are listed back, never asked.
     names = list(dict.fromkeys(args.facts))
-    unknown = [f[:60] for f in names if f not in QUESTIONS]
-    askable = [f for f in names if f in QUESTIONS]
+    service_problem = _service_question_problem(box.context) if SERVICE_QUESTION in names else None
+    unknown = [f[:60] for f in names if f not in QUESTIONS and f != SERVICE_QUESTION]
+    askable = [f for f in names if f in QUESTIONS or (f == SERVICE_QUESTION and service_problem is None)]
     if not askable:
-        return _refused("ask_human", f"no fixed question for: {', '.join(unknown)}")
+        reasons = [f"no fixed question for: {', '.join(unknown)}"] if unknown else []
+        reasons += [service_problem] if service_problem else []
+        return _refused("ask_human", "; ".join(reasons)[:300])
     for name in askable:
         if name not in box.context.pending_questions:
             box.context.queue_question(name)
     pending = box.context.pending_questions
     already = [n for n in askable if n in box.context.asked and n not in pending]
-    content = {"queued": [QUESTIONS[n].text for n in box.context.pending_questions],
+    content = {"queued": [question_text(n) for n in box.context.pending_questions],
                "note": "the run pauses here; the human answers these and reviews all suggestions"}
     if already:
         content["already_asked"] = already  # never asked twice in one run
     if unknown:
         content["no_fixed_question"] = unknown
         content["no_fixed_question_note"] = NO_QUESTION_NOTE
+    if service_problem:
+        content["service_question_not_asked"] = service_problem
     if not box.context.pending_questions:
         content["note"] = "nothing new to ask: these were already asked in this run"
     return _ok("ask_human", content)
+
+
+def _service_question_problem(context: RunContext) -> str | None:
+    """Why the service question can't be asked now, or None if it can (C01 live test, Sam, 13 November 2026)."""
+    if context.incident_service is not None:
+        return f"{SERVICE_QUESTION} not asked: the incident service is already {context.incident_service}"
+    if len(context.candidates) < 2:
+        return (f"{SERVICE_QUESTION} not asked: it is only asked when find_service returned several services; "
+                "use find_service, or get_service for the one service")
+    return None
+
+
+def question_text(name: str) -> str:
+    """The fixed wording of a queued question (a fact question, or the service question)."""
+    return SERVICE_QUESTION_TEXT if name == SERVICE_QUESTION else QUESTIONS[name].text
 
 
 NO_QUESTION_NOTE = ("not asked: no fixed question exists. These come only from a bank system, or from the "
@@ -501,23 +647,30 @@ def where_to_find(missing: tuple[str, ...]) -> dict[str, list[str]]:
     return grouped
 
 
-UNCHANGED_NOTE = ("no fact changed since your last run_rules: same result, same missing facts. Use that "
-                  "result's where_to_find, or ask_human, or stop.")
+UNCHANGED_NOTE = ("no fact changed since the last status: same result, same missing facts. Use that "
+                  "status's where_to_find, or ask_human, or stop.")
 
 
-def _run_rules(box: Toolbox, args: NoArgs) -> ToolOutcome:
-    facts = box._store.snapshot()
-    result = classify(facts, box.context.as_of)
-    box.context.last_classification = result
-    conflicts = [c.describe() for c in box._store.conflicts()]
+def status(store: FactStore, context: RunContext, result: Classification | None = None) -> dict[str, Any]:
+    """The short status plain code adds after every step (approved by Sam on 13 November 2026).
+
+    It replaces the run_rules tool: the LLM no longer spends a step to see the engine's result. The result
+    comes only from the rules engine (hard rule 1); this only reports it, with where to look next.
+    """
+    facts = store.snapshot()
+    result = result or classify(facts, context.as_of)
+    context.last_classification = result
+    conflicts = [c.describe() for c in store.conflicts()]
     # Same facts and conflicts in, same result out: the engine is plain code (hard rule 1). So the full
-    # answer, which the LLM already has, is not sent again. The result word is always sent.
-    seen = json.dumps([facts.model_dump(mode="json"), conflicts], sort_keys=True, default=str)
-    if seen == box.context.rules_seen:
-        return _ok("run_rules", {"result": result.result, "unchanged": True, "note": UNCHANGED_NOTE})
-    box.context.rules_seen = seen
+    # status, which the LLM already has, is not sent again. The result word is always sent.
+    seen = json.dumps([facts.model_dump(mode="json"), conflicts, context.incident_service],
+                      sort_keys=True, default=str)
+    if seen == context.status_seen:
+        return {"result": result.result, "unchanged": True, "note": UNCHANGED_NOTE}
+    context.status_seen = seen
     content = {
         "result": result.result,
+        "incident_service": context.incident_service or "not chosen yet: get_service",
         "thresholds_met": list(result.thresholds_met),
         "check_first": check_first(result),
         # Every missing fact is in where_to_find (a test checks), so a separate "missing" list is not sent.
@@ -529,7 +682,7 @@ def _run_rules(box: Toolbox, args: NoArgs) -> ToolOutcome:
         "conflicts": conflicts,
     }
     # Empty lists are left out (shorter prompts); "result" and "where_to_find" are always sent.
-    return _ok("run_rules", {k: v for k, v in content.items() if v or k in ("result", "where_to_find")})
+    return {k: v for k, v in content.items() if v or k in ("result", "where_to_find")}
 
 
 def _facts_held(facts) -> list[tuple[str, Any]]:
@@ -575,8 +728,8 @@ _TOOLS = [
           ServiceArgs, _get_service),
     _Tool(_spec("get_outage_timeline", "Monitoring: outage times.", TimelineArgs),
           TimelineArgs, _get_outage_timeline),
-    _Tool(_spec("get_client_impact", "Affected clients, transactions, countries.", WindowArgs),
-          WindowArgs, _get_client_impact),
+    _Tool(_spec("get_client_impact", "Affected clients, transactions, countries.", ImpactArgs),
+          ImpactArgs, _get_client_impact),
     _Tool(_spec("get_daily_averages", "Client totals and daily averages.", ServiceArgs),
           ServiceArgs, _get_daily_averages),
     _Tool(_spec("get_security_alerts", "Security alerts: malicious access, data impact.", AlertArgs),
@@ -590,6 +743,28 @@ _TOOLS = [
     _Tool(_spec("suggest_facts", "Suggest facts from the ticket; a human confirms.", SuggestArgs),
           SuggestArgs, _suggest_facts),
     _Tool(_spec("ask_human", "Queue fixed questions for a human.", AskArgs), AskArgs, _ask_human),
-    _Tool(_spec("run_rules", "Rules engine: result, check_first, where_to_find (all missing facts), known.", NoArgs),
-          NoArgs, _run_rules),
 ]
+
+# The tools listed for the LLM besides `lookups` (the single lookups are reached through `lookups`).
+OFFERED = ("use_record", "suggest_facts", "ask_human")
+
+# One line per lookup: its arguments ("?" = may be left out). Short, because it is sent with every LLM call.
+LOOKUPS_SPEC = ToolSpec(
+    name="lookups",
+    description=(
+        "Read-only bank lookups. List ALL you need now in one call (up to 6); they run in one step. "
+        "find_service {text}; get_service {service_id}; get_outage_timeline {service_id, around?, window_hours?}; "
+        "get_client_impact {service_id, start?, end?} (leave the window out: code uses the outage times); "
+        "get_daily_averages {service_id}; get_security_alerts {start, end, service_id?}; "
+        "get_suppliers_for_service {service_id}; get_supplier {supplier_id}; "
+        "get_supplier_notices {supplier_id, start, end}. Times: ISO 8601 with zone."),
+    parameters={
+        "type": "object",
+        "properties": {"calls": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"tool": {"type": "string", "enum": list(LookupName.__args__)},
+                           "args": {"type": "object"}},
+            "required": ["tool", "args"]}}},
+        "required": ["calls"],
+    },
+)

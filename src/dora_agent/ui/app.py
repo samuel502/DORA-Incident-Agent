@@ -6,6 +6,8 @@ Safety rules (block 6 plan, section 6; security framework, "Unsafe output"):
   text as text: `<script>` stays the characters `<script>`.
 - gr.Markdown holds only the fixed texts in TEXTS below, and no button ever writes to it. gr.HTML is
   not used. Labels are fixed texts from this file or from the fixed questions in agent/questions.py.
+  The one exception: the service question's label also lists the matching services' IDs and names, which
+  come from the (synthetic) service list, never from the ticket or the AI. Its choices are those IDs.
 - Every button is hidden from Gradio's API page and its client libraries (api_visibility="private"),
   the REST routes that skip the queue are closed (api_open=False), and one request runs at a time.
 - Tests check all of this (tests/ui/test_app.py).
@@ -19,12 +21,13 @@ from collections.abc import Callable
 
 import gradio as gr
 
-from dora_agent.agent.questions import QUESTIONS
+from dora_agent.agent.questions import QUESTIONS, SERVICE_QUESTION
 from dora_agent.config import agent_limits, notification_settings
 from dora_agent.llm import get_provider
 from dora_agent.llm.provider import LlmProvider
 from dora_agent.notification.fields import DISCOVERY_CHOICES
 from dora_agent.ui import controller as c
+from dora_agent.ui import views
 from dora_agent.ui.views import FACT_HEADERS
 
 TITLE = "Rheinbank DORA incident check"
@@ -86,6 +89,10 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
         with _hidden_group() as human_panel:
             gr.Markdown(TEXTS["human"])
             name = gr.Textbox(label="Your name (recorded with your answers)", max_length=80)
+            # Which service to classify, when several match and their records do not tell them apart.
+            # The choices are filled in per run: the service IDs find_service returned.
+            with _hidden_group() as service_group:
+                service_answer = gr.Radio(choices=[], value=None, label="Which service is the affected service?")
             question_boxes = {}
             for fact_name in c.QUESTION_NAMES:
                 question = QUESTIONS[fact_name]
@@ -143,7 +150,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             download_text = gr.DownloadButton("Download as text", visible=False)
             download_json = gr.DownloadButton("Download as JSON", visible=False)
 
-        outputs = [state, status, headline, human_panel]
+        outputs = [state, status, headline, human_panel, service_group, service_answer]
         for group, answer, estimate in question_boxes.values():
             outputs += [group, answer, estimate]
         for group, text, choice, value, estimate in review_boxes.values():
@@ -156,6 +163,13 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             asked = {q.fact_name for q in shown.questions}
             values: list = [session, shown.status, shown.headline,
                             gr.update(visible=bool(shown.questions or shown.review))]
+            service_question = next((q for q in shown.questions if q.fact_name == SERVICE_QUESTION), None)
+            if service_question is not None:
+                values += [gr.update(visible=True),
+                           gr.update(choices=list(service_question.choices or ()), value=None,
+                                     label=views.question_label(service_question))]
+            else:
+                values += [gr.update(visible=False), gr.update(value=None) if reset else gr.update()]
             for fact_name, (_, answer, _) in question_boxes.items():
                 values += [gr.update(visible=fact_name in asked),
                            gr.update(value=None if isinstance(answer, gr.Radio) else "") if reset else gr.update(),
@@ -185,9 +199,10 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
         review_inputs = [component for _, _, choice, value, estimate in review_boxes.values()
                          for component in (choice, value, estimate)]
 
-        def on_send(state_value, name_text, *values):
+        def on_send(state_value, name_text, service_value, *values):
             session = session_of(state_value)
             given = dict(zip(c.QUESTION_NAMES, zip(values[0:len(answer_inputs):2], values[1:len(answer_inputs):2])))
+            given[SERVICE_QUESTION] = (service_value, False)
             rest = values[len(answer_inputs):]
             review = dict(zip(c.REVIEW_NAMES, zip(rest[0::3], rest[1::3], rest[2::3])))
             return render(session, c.send_answers(session, name_text, given, review))
@@ -204,7 +219,8 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
         private = {"api_visibility": "private"}
         sample.change(c.load_sample, [sample], [ticket, reported], **private)
         run_button.click(on_run, [state, ticket, reported, sample], outputs, **private)
-        send_button.click(on_send, [state, name, *answer_inputs, *review_inputs], outputs, **private)
+        send_button.click(on_send, [state, name, service_answer, *answer_inputs, *review_inputs], outputs,
+                          **private)
         draft_button.click(on_draft, [state, causes], outputs, **private)
         approve_button.click(on_approve, [state, approver, discovery, plan, third_party, other, description],
                              outputs, **private)

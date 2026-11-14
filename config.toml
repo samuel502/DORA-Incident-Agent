@@ -74,6 +74,10 @@ max_repeated_calls = 2
 # by Sam on 8 November 2026). Time spent waiting for a person to answer does not count. No AI call, pacing
 # wait or retry wait may go past it. The slowest measured live run took 7 min 13 s (B03, 6 November 2026).
 max_run_seconds = 600
+# get_client_impact without a window (window hardening, C01 live test, approved by Sam on 13 November 2026):
+# code searches from the known incident start to the known restore time. Where one is not known yet, it uses
+# this many days before or after the reported time instead.
+client_impact_default_days = 7
 
 [notification]
 # Block 5b: the draft initial notification. Nothing is ever sent.

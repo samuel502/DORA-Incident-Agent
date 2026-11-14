@@ -117,6 +117,7 @@ class AgentLimits:
     gate_check_alert_days_after: int
     max_repeated_calls: int
     max_run_seconds: int  # hard total working time per run (block 6 step 3)
+    client_impact_default_days: int  # get_client_impact without a window, if outage times are not known yet
 
 
 # Upper bound for max_run_seconds, so a typo can't switch the time limit off in practice.
@@ -138,6 +139,9 @@ def agent_limits() -> AgentLimits:
         raise ValueError("config.toml [agent] gate check alert window must be at most 31 days (connector limit)")
     if values["max_run_seconds"] > MAX_RUN_SECONDS_CAP:
         raise ValueError(f"config.toml [agent] max_run_seconds must be at most {MAX_RUN_SECONDS_CAP}")
+    if values["client_impact_default_days"] > 183:
+        raise ValueError("config.toml [agent] client_impact_default_days must be at most 183 "
+                         "(the window is twice as long, and the connector allows 366 days)")
     return AgentLimits(**values)
 
 

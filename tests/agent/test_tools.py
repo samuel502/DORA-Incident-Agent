@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import pytest
 
 from dora_agent.agent.fact_store import FactStore
-from dora_agent.agent.tools import UNCHANGED_NOTE, RunContext, Toolbox
+from dora_agent.agent.tools import UNCHANGED_NOTE, RunContext, Toolbox, status
 from dora_agent.llm.fake_provider import call
 from dora_agent.llm.provider import ToolCall
 
@@ -25,6 +25,11 @@ def box_at(reported_at=B01_REPORTED):
 def run(box, name, **arguments):
     """Run one tool call exactly as the LLM would propose it."""
     return box.run(call(name, **arguments).tool_calls[0])
+
+
+def rules(box):
+    """The status plain code adds after each step (it replaced the run_rules tool, Sam, 13 November 2026)."""
+    return status(box._store, box.context)
 
 
 # ---------- refusals ----------
@@ -205,18 +210,17 @@ def test_b01_path_through_the_tools_gives_major():
         ("get_daily_averages", {"service_id": "SVC-OLB"}),
     ]:
         assert run(box, name, **arguments).ok, name
-    outcome = run(box, "run_rules")
-    assert outcome.content["result"] == "major"
-    assert outcome.content["thresholds_met"] == ["T1", "T3"]
+    content = rules(box)
+    assert content["result"] == "major"
+    assert content["thresholds_met"] == ["T1", "T3"]
     assert box.context.last_classification.result == "major"
 
 
-def test_run_rules_shows_conflicts():
+def test_status_shows_conflicts():
     box, store = box_at()
     store.human_desk().answer("critical_or_important", "no", confirmed_by="Sam")
     run(box, "get_service", service_id="SVC-OLB")  # service list says critical: yes
-    outcome = run(box, "run_rules")
-    assert outcome.content["conflicts"] == [
+    assert rules(box)["conflicts"] == [
         "critical_or_important: using False (confirmed by Sam, source human), but service_list says True. "
         "Please check and correct if needed."]
 
@@ -290,9 +294,9 @@ def test_attack_confirmation_written_into_the_reason_text_does_nothing():
     facts = store.snapshot()
     assert facts.media_coverage.confirmed_by is None and facts.costs_eur.confirmed_by is None
     assert facts.usable("media_coverage") is None and facts.usable("costs_eur") is None
-    outcome = run(box, "run_rules")
-    assert outcome.content.get("thresholds_met", []) == []  # T2 and T6 not counted (empty: left out)
-    assert sorted(outcome.content["waiting_for_human"]) == ["costs_eur", "media_coverage"]
+    content = rules(box)
+    assert content.get("thresholds_met", []) == []  # T2 and T6 not counted (empty: left out)
+    assert sorted(content["waiting_for_human"]) == ["costs_eur", "media_coverage"]
 
 
 def test_attack_full_sequence_from_a_scripted_llm_changes_nothing():
@@ -323,25 +327,25 @@ def test_tool_results_go_back_as_plain_json():
 
 from dora_agent.agent.prompts import SYSTEM_PROMPT  # noqa: E402
 from dora_agent.agent.questions import QUESTIONS  # noqa: E402
-from dora_agent.agent.tools import WHERE_TO_FIND  # noqa: E402
+from dora_agent.agent.tools import OFFERED, WHERE_TO_FIND, LookupName  # noqa: E402
 from dora_agent.rules.facts import IncidentFacts  # noqa: E402
 
 HR_REPORTED = datetime(2026, 3, 10, 6, 40, tzinfo=UTC)
 
 
 def test_where_to_find_covers_every_fact_and_names_real_tools_only():
-    box, _ = box_at()
-    tools = {spec.name for spec in box.specs()}
+    # Tool names the LLM can use: the lookups listed in the lookups tool, plus the tools offered directly.
+    tools = set(LookupName.__args__) | set(OFFERED)
     assert set(WHERE_TO_FIND) == set(IncidentFacts.model_fields) - {"service_id"}
     for fact, names in WHERE_TO_FIND.items():
         assert names and set(names) <= tools, fact
         assert "ask_human" not in names or fact in QUESTIONS, fact  # ask_human only where a fixed question exists
 
 
-def test_n01_run_rules_points_at_the_security_alerts_first():
+def test_n01_status_points_at_the_security_alerts_first():
     box, _ = box_at(HR_REPORTED)
     run(box, "get_service", service_id="SVC-HR")
-    content = run(box, "run_rules").content
+    content = rules(box)
     # Not critical, not regulated: only G-c (RTS-C Art. 6(c)) can still open the gate, so its facts come first.
     assert content["check_first"] == ["malicious_access", "access_on_own_systems"]
     assert content["where_to_find"]["get_security_alerts"][:2] == ["malicious_access", "access_on_own_systems"]
@@ -351,7 +355,7 @@ def test_n01_run_rules_points_at_the_security_alerts_first():
 def test_no_check_first_once_the_gate_is_passed():
     box, _ = box_at()
     run(box, "get_service", service_id="SVC-OLB")  # critical: gate passed (G-a)
-    content = run(box, "run_rules").content
+    content = rules(box)
     assert "check_first" not in content  # empty lists are left out of the LLM's copy
     assert "get_client_impact" in content["where_to_find"]
 
@@ -359,7 +363,7 @@ def test_no_check_first_once_the_gate_is_passed():
 def test_where_to_find_lists_only_missing_facts():
     box, _ = box_at()
     run(box, "get_service", service_id="SVC-OLB")
-    content = run(box, "run_rules").content
+    content = rules(box)
     listed = {fact for facts in content["where_to_find"].values() for fact in facts}
     # where_to_find holds every missing fact, so the LLM no longer gets a separate "missing" list.
     assert listed == set(box.context.last_classification.missing)
@@ -378,7 +382,7 @@ def test_tool_specs_sent_to_the_llm_are_slim_but_limits_still_apply():
 
 
 def test_instructions_ask_for_batched_lookups_and_keep_the_checklist():
-    assert "ONE answer" in SYSTEM_PROMPT
+    assert "ONE lookups call" in SYSTEM_PROMPT
     assert "check_first" in SYSTEM_PROMPT and "where_to_find" in SYSTEM_PROMPT
     assert "CHECKLIST OF FACTS" in SYSTEM_PROMPT  # project brief: the checklist stays in the instructions
 
@@ -474,40 +478,40 @@ def test_countries_come_from_client_data_or_a_suggestion():
 # ---------- shorter prompts for the free tier (approved by Sam on 11 November 2026) ----------
 
 
-def test_run_rules_answers_briefly_when_no_fact_changed():
+def test_status_is_short_when_no_fact_changed():
     box, _ = box_at(C01_REPORTED)
     run(box, "get_service", service_id="SVC-OLB")
-    full = run(box, "run_rules").content
+    full = rules(box)
     assert "where_to_find" in full
-    again = run(box, "run_rules").content
+    again = rules(box)
     assert again == {"result": full["result"], "unchanged": True, "note": UNCHANGED_NOTE}
-    run(box, "get_outage_timeline", service_id="SVC-OLB")  # new facts: the full answer comes back
-    assert "where_to_find" in run(box, "run_rules").content
+    run(box, "get_outage_timeline", service_id="SVC-OLB")  # new facts: the full status comes back
+    assert "where_to_find" in rules(box)
 
 
-def test_run_rules_full_answer_again_after_a_new_suggestion():
+def test_status_full_again_after_a_new_suggestion():
     box, _ = box_at(C01_REPORTED)
     run(box, "get_service", service_id="SVC-OLB")
-    run(box, "run_rules")
+    rules(box)
     run(box, "suggest_facts", suggestions=[{"fact": "media_coverage", "value": True, "reason": "in the news"}])
-    content = run(box, "run_rules").content
+    content = rules(box)
     assert content["waiting_for_human"] == ["media_coverage"]  # a suggestion counts as a change
 
 
-def test_run_rules_lists_known_facts_by_name_but_not_suggestions():
+def test_status_lists_known_facts_by_name_but_not_suggestions():
     box, _ = box_at(C01_REPORTED)
     run(box, "get_service", service_id="SVC-OLB")
     run(box, "suggest_facts", suggestions=[{"fact": "media_coverage", "value": True, "reason": "in the news"}])
-    content = run(box, "run_rules").content
+    content = rules(box)
     assert content["known"] == ["critical_or_important", "regulated_service"]  # names only, no values
     assert "media_coverage" not in content["known"]
 
 
-def test_run_rules_leaves_out_missing_summary_and_empty_lists():
+def test_status_leaves_out_missing_summary_and_empty_lists():
     box, _ = box_at(C01_REPORTED)
     run(box, "get_service", service_id="SVC-OLB")
-    content = run(box, "run_rules").content
-    assert set(content) == {"result", "where_to_find", "known"}  # nothing else is set yet
+    content = rules(box)
+    assert set(content) == {"result", "incident_service", "where_to_find", "known"}  # nothing else is set yet
     assert box.context.last_classification.missing  # the full list is still held by the code
 
 
@@ -549,3 +553,143 @@ def test_tool_list_sent_with_every_call_stays_short():
     from dora_agent.llm.pacing import estimate_tokens
     box, _ = box_at(C01_REPORTED)
     assert estimate_tokens([_tool_to_wire(s) for s in box.specs()]) <= 1100  # was 1,331 before the cut
+
+
+# ---------- lookups tool, status, service question, window (C01 live test, approved by Sam on 13 Nov 2026) ----------
+
+from dora_agent.agent.questions import SERVICE_QUESTION  # noqa: E402
+from dora_agent.agent.tools import RUN_RULES_GONE, SEVERAL_NOTE, ToolOutcome  # noqa: E402
+
+
+def lookups_call(*items, call_id="L"):
+    return call("lookups", call_id=call_id, calls=[{"tool": n, "args": a} for n, a in items]).tool_calls[0]
+
+
+def test_the_llm_is_offered_one_lookups_tool_and_no_run_rules():
+    box, _ = box_at()
+    assert [spec.name for spec in box.specs()] == ["lookups", "use_record", "suggest_facts", "ask_human"]
+    lookups = box.specs()[0]
+    assert set(lookups.parameters["properties"]["calls"]["items"]["properties"]["tool"]["enum"]) == set(
+        LookupName.__args__)
+
+
+def test_run_rules_called_anyway_is_refused_with_a_plain_reason():
+    box, _ = box_at()
+    outcome = run(box, "run_rules")
+    assert not outcome.ok and outcome.error == RUN_RULES_GONE
+
+
+def test_lookups_expand_into_single_calls_the_llm_chose():
+    box, _ = box_at()
+    singles = box.expand(lookups_call(("get_service", {"service_id": "SVC-OLB"}),
+                                      ("get_daily_averages", {"service_id": "SVC-OLB"})))
+    assert [(c.call_id, c.name, c.arguments) for c in singles] == [
+        ("L-0", "get_service", {"service_id": "SVC-OLB"}), ("L-1", "get_daily_averages", {"service_id": "SVC-OLB"})]
+
+
+@pytest.mark.parametrize("calls", [
+    [],  # nothing listed
+    [{"tool": "suggest_facts", "args": {}}],  # not a lookup: suggestions and questions stay their own tools
+    [{"tool": "ask_human", "args": {"facts": ["media_coverage"]}}],
+    [{"tool": "get_service", "args": {"service_id": "SVC-OLB"}, "confirmed_by": "Sam"}],  # smuggled field
+    [{"tool": "get_service"}],  # no args
+    "get_service",  # not a list
+])
+def test_malformed_lookups_are_refused_and_nothing_runs(calls):
+    box, store = box_at()
+    outcome = box.expand(call("lookups", calls=calls).tool_calls[0])
+    assert isinstance(outcome, ToolOutcome) and not outcome.ok and outcome.error.startswith("invalid arguments")
+    assert store.events == ()
+
+
+def test_each_listed_lookup_is_still_checked_like_a_single_call():
+    box, store = box_at()
+    [bad] = box.expand(lookups_call(("get_service", {"service_id": "SVC-OLB", "confirmed_by": "Sam"})))
+    assert box.run(bad).error.startswith("invalid arguments")
+    assert store.events == ()
+
+
+def test_find_service_with_several_matches_says_to_check_them_and_remembers_the_candidates():
+    box, _ = box_at(C01_REPORTED)
+    outcome = run(box, "find_service", text="online or mobile banking")
+    assert outcome.content["note"] == SEVERAL_NOTE
+    assert box.context.candidates == {"SVC-MOB": "Mobile banking app", "SVC-OLB": "Online banking"}
+    assert "note" not in run(box, "find_service", text="online banking").content  # one match: no note
+
+
+def test_service_question_needs_several_candidates_and_no_service_yet():
+    box, _ = box_at(C01_REPORTED)
+    refused = run(box, "ask_human", facts=[SERVICE_QUESTION])
+    assert not refused.ok and "only asked when find_service returned several services" in refused.error
+    run(box, "find_service", text="online or mobile banking")
+    assert run(box, "ask_human", facts=[SERVICE_QUESTION]).ok
+    assert box.context.pending_questions == [SERVICE_QUESTION]
+
+
+def test_service_question_is_not_asked_once_the_service_is_chosen():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "find_service", text="online or mobile banking")
+    run(box, "get_service", service_id="SVC-OLB")
+    outcome = run(box, "ask_human", facts=[SERVICE_QUESTION, "media_coverage"])
+    assert box.context.pending_questions == ["media_coverage"]
+    assert "already SVC-OLB" in outcome.content["service_question_not_asked"]
+
+
+def test_suggestions_for_facts_held_from_a_system_are_refused():
+    box, store = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")  # critical_or_important now from the service list
+    refused = run(box, "suggest_facts", suggestions=[
+        {"fact": "critical_or_important", "value": True, "reason": "online banking is critical"}])
+    assert not refused.ok and "already known from a system or a person" in refused.error
+    mixed = run(box, "suggest_facts", suggestions=[
+        {"fact": "critical_or_important", "value": True, "reason": "x"},
+        {"fact": "media_coverage", "value": True, "reason": "in the news"}])
+    assert mixed.ok and mixed.content["refused"] == ["critical_or_important"]
+    assert [i.fact_name for i in store.review_items()] == ["media_coverage"]
+
+
+def test_suggestions_for_facts_a_person_answered_are_refused_too():
+    box, store = box_at(C01_REPORTED)
+    store.human_desk().answer("media_coverage", "no", confirmed_by="Sam")
+    assert not run(box, "suggest_facts", suggestions=[
+        {"fact": "media_coverage", "value": True, "reason": "x"}]).ok
+
+
+def test_client_impact_without_a_window_follows_the_known_outage_times():
+    box, store = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    run(box, "get_outage_timeline", service_id="SVC-OLB")  # PRB-0002: start 15 Feb, restored 23 May, resolved 31 Jul
+    outcome = run(box, "get_client_impact", service_id="SVC-OLB")
+    assert outcome.content["window_used"] == {"start": "2025-02-15T21:00:00+00:00", "end": "2025-07-31T15:00:00+00:00"}
+    assert store.snapshot().affected_clients.value == 520000  # IMP-0001
+
+
+def test_client_impact_without_a_window_and_no_outage_times_searches_around_the_reported_time():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    outcome = run(box, "get_client_impact", service_id="SVC-OLB")
+    # config.toml [agent] client_impact_default_days = 7
+    assert outcome.content["window_used"] == {"start": "2025-02-08T21:00:00+00:00", "end": "2025-02-22T21:00:00+00:00"}
+    assert outcome.facts_recorded  # IMP-0001 overlaps
+
+
+def test_a_window_the_llm_gives_is_used_as_given():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    outcome = run(box, "get_client_impact", service_id="SVC-OLB", **C01_WINDOW)
+    assert "window_used" not in outcome.content
+
+
+def test_default_window_is_never_longer_than_the_connector_allows():
+    box, store = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    store.human_desk().answer("resolved_at", "2027-01-01T00:00:00Z", confirmed_by="Sam", is_estimate=True)
+    outcome = run(box, "get_client_impact", service_id="SVC-OLB", start="2025-02-15T21:00:00Z")
+    assert outcome.ok and outcome.content["window_used"]["end"] == "2026-02-16T21:00:00+00:00"  # start + 366 days
+
+
+def test_status_says_which_service_is_the_incident_service():
+    box, _ = box_at(C01_REPORTED)
+    assert rules(box)["incident_service"] == "not chosen yet: get_service"
+    run(box, "get_service", service_id="SVC-OLB")
+    assert rules(box)["incident_service"] == "SVC-OLB"

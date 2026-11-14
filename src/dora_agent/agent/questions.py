@@ -119,6 +119,16 @@ QUESTIONS: dict[str, Question] = {
 }
 
 
+# Which service to classify, when several services match the ticket and their records do not tell them apart
+# (C01 live test, approved by Sam on 13 November 2026). It is not a fact for the rules engine, so it is not in
+# QUESTIONS. The wording is fixed; the choices are the service IDs find_service returned in this run, and only
+# those can be answered. The chosen service becomes the incident service (get_service, run by code).
+SERVICE_QUESTION = "incident_service"
+SERVICE_QUESTION_TEXT = ("Several services match this ticket and their records do not tell them apart. "
+                         "Which service is the affected service to classify?")
+SERVICE_QUESTION_BASIS = "docs/dora-rules.md section 6: affected service (gate, T1, T3), from the ticket and service list"
+
+
 class AnswerProblem(ValueError):
     """The answer does not fit the question. Plain message, safe to show."""
 

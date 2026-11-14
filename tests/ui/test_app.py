@@ -145,3 +145,35 @@ def test_gradio_accepts_every_value_the_buttons_give(tmp_path, monkeypatch):
             if isinstance(value, dict) or isinstance(component, gr.State):
                 continue  # gr.update(...) and the session are handled by Gradio separately
             component.postprocess(value)
+
+
+# ---------- the service question (C01 live test, approved by Sam on 13 November 2026) ----------
+
+
+def test_service_question_shows_its_choices_and_the_answer_goes_through(tmp_path, monkeypatch):
+    from dora_agent.llm.fake_provider import call
+
+    def lookups(*items):
+        return call("lookups", call_id="L", calls=[{"tool": n, "args": a} for n, a in items])
+
+    monkeypatch.setattr(c, "RUN_LOG_DIR", tmp_path)
+    demo = built(lambda: FakeProvider([
+        lookups(("find_service", {"text": "online or mobile banking"})),
+        call("ask_human", facts=["incident_service"]),
+        lookups(("get_outage_timeline", {"service_id": "SVC-OLB"}), ("get_client_impact", {"service_id": "SVC-OLB"}),
+                ("get_daily_averages", {"service_id": "SVC-OLB"})),
+    ]))
+    run = event(demo, "Run")
+    ticket = "Customers can't log into online or mobile banking."
+    values = run.fn(None, ticket, "2025-02-15T21:00Z", None)
+    radio = next(o for o in run.outputs if isinstance(o, gr.Radio) and o.label == "Which service is the affected service?")
+    shown = values[run.outputs.index(radio)]
+    group = values[run.outputs.index(radio) - 1]
+    assert group["visible"] is True
+    assert shown["choices"] == ["SVC-MOB", "SVC-OLB"] and "SVC-OLB = Online banking" in shown["label"]
+
+    send = event(demo, "Send answers")
+    assert send.inputs[2] is radio  # the answer box is read when the person sends
+    args = [values[0], "Sam", "SVC-OLB"] + [None] * (len(send.inputs) - 3)
+    after = send.fn(*args)
+    assert after[2].startswith("Result from the rules engine: MAJOR")

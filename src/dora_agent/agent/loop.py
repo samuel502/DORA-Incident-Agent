@@ -21,13 +21,21 @@ A missing security alert alone never rules out G-c.
 
 After every step (block 5 step 5, approved by Sam):
 - Plain code runs the rules engine on the stored facts. A final result (major, not major, not an incident)
-  ends the run at once. The LLM does not need to call run_rules for that.
+  ends the run at once. Otherwise code adds a short status for the LLM: the result, what to check first,
+  where to find each missing fact, and what is known (tools.status). run_rules is no longer an LLM tool
+  (C01 live test, approved by Sam on 13 November 2026).
 - If every fact that still decides the result can only come from a human (its system lookups have all
   run, per where_to_find), code asks the fixed questions itself. It does not wait for the LLM to do it.
 - No question is asked twice in one run. If the only help left is a question already asked
   (for example, answered "unsure"), the run ends with the result open: stop reason "no_more_sources".
 - Repeated identical lookups are answered from memory (tools.py). After max_repeated_calls repeats,
   the LLM is not asked again: the run goes to the human questions, or ends.
+
+Lookups (C01 live test, approved by Sam on 13 November 2026): the LLM lists the bank lookups it wants in one
+`lookups` call. Each listed lookup is run and logged like a single tool call, and counts against the same
+limits (per answer and per run). The LLM chooses every lookup; code only runs them, get_service first, then
+the outage timeline, then the rest in the LLM's order. While no incident service is chosen, get_service for
+two different services in one answer is refused: the LLM must pick one, or ask the human (service question).
 
 A run can pause for the human: `start()` or `resume()` return status "needs_human" with the fixed
 questions and the list of ticket suggestions to review. The interface (block 6) or the test harness
@@ -49,8 +57,10 @@ from pydantic import BaseModel, ConfigDict
 from dora_agent.agent.fact_store import Conflict, FactStore, ReviewDecision, ReviewItem, StoreProblem
 from dora_agent.agent.prompts import (REPAIR_MESSAGE, new_marker_code, system_prompt, task_message,
                                       tool_message)
-from dora_agent.agent.questions import AnswerProblem, QUESTIONS, interpret_answer
-from dora_agent.agent.tools import WHERE_TO_FIND, RunContext, Toolbox, check_first
+from dora_agent.agent.questions import (AnswerProblem, QUESTIONS, SERVICE_QUESTION, SERVICE_QUESTION_BASIS,
+                                        SERVICE_QUESTION_TEXT, interpret_answer)
+from dora_agent.agent.tools import RUN_FIRST, WHERE_TO_FIND, RunContext, Toolbox, ToolOutcome, check_first
+from dora_agent.agent.tools import status as rules_status
 from dora_agent.audit import DecisionLog
 from dora_agent.config import AgentLimits, agent_limits, llm_settings
 from dora_agent.llm.provider import TIME_LIMIT, LlmError, LlmProvider, Message, ToolCall
@@ -67,8 +77,11 @@ StopReason = Literal["final_result", "needs_human", "llm_finished", "step_limit"
 HUMAN_TOOLS = frozenset({"ask_human", "suggest_facts"})
 HumanOnly = Literal["not_yet", "ask", "done"]
 
-# What an older full run_rules answer is cut to in the conversation once a newer one arrives.
-OLD_RULES_STUB = {"note": "older run_rules result, replaced by a newer one below"}
+# What an older status is cut to in the conversation once a newer one arrives (shorter prompts).
+OLD_STATUS = "(older status, replaced by a newer one below)"
+STATUS_INTRO = "Status after this step, from the rules engine (plain code):\n"
+TWO_SERVICES = ("not run: get_service for more than one service in one answer. Pick the one service whose records "
+                f'show this incident, or ask_human with ["{SERVICE_QUESTION}"] if the records do not tell them apart.')
 
 
 class RunProblem(ValueError):
@@ -128,7 +141,8 @@ class AgentRun:
         self._provider = provider
         self._store = FactStore()
         self._context = RunContext(reported_at=reported_at, as_of=as_of or reported_at)
-        self._toolbox = Toolbox(self._store, self._context, self._limits.max_tool_result_chars)
+        self._toolbox = Toolbox(self._store, self._context, self._limits.max_tool_result_chars,
+                                self._limits.client_impact_default_days)
         self._code = new_marker_code()
         self._messages = [
             Message(role="system", content=system_prompt(self._code)),
@@ -139,7 +153,7 @@ class AgentRun:
         self._repairing = False  # True right after a refused, unreadable tool call (one retry only)
         self._tool_path: list[str] = []
         self._logged_events = 0
-        self._last_rules_reply: int | None = None  # where the newest full run_rules answer is in _messages
+        self._last_status: int | None = None  # where the newest status message is in _messages
         self._state: Status | None = None
         self._log.write(
             "run_started", ticket=ticket, ticket_sha256=hashlib.sha256(ticket.encode()).hexdigest(),
@@ -179,7 +193,13 @@ class AgentRun:
         not_asked = sorted(set(answers) - queued)
         if not_asked:
             raise RunProblem(f"these were not asked: {', '.join(n[:60] for n in not_asked)}")
-        for name, answer in answers.items():
+        service = answers.get(SERVICE_QUESTION)
+        if SERVICE_QUESTION in answers and service not in self._context.candidates:
+            raise RunProblem(f"{SERVICE_QUESTION} must be one of: {', '.join(self._context.candidates)}")
+        if SERVICE_QUESTION in estimates:
+            raise RunProblem(f"{SERVICE_QUESTION} cannot be an estimate")
+        fact_answers = {name: answer for name, answer in answers.items() if name != SERVICE_QUESTION}
+        for name, answer in fact_answers.items():
             try:
                 interpret_answer(name, answer)
             except AnswerProblem as problem:
@@ -190,7 +210,7 @@ class AgentRun:
         try:
             if self._store.review_items() or review:
                 desk.review(review or [], confirmed_by=confirmed_by)  # all or nothing
-            for name, answer in answers.items():
+            for name, answer in fact_answers.items():
                 desk.answer(name, answer, confirmed_by=confirmed_by, is_estimate=name in estimates)
         except StoreProblem as problem:
             raise RunProblem(str(problem)) from None
@@ -201,6 +221,11 @@ class AgentRun:
                         unanswered=sorted(queued - set(answers)))
         self._log_new_events()
         self._context.pending_questions.clear()
+        if service is not None:
+            # The human picked the service: code runs get_service for it, so it becomes the incident service
+            # and its service list facts are recorded (source: service list). The LLM does not choose it.
+            self._run_tool(ToolCall(call_id="service-answer", name="get_service",
+                                    arguments={"service_id": service}, raw_arguments=""), by="human answer")
 
         current = self._rules_check()
         if current.result in FINAL:
@@ -210,9 +235,11 @@ class AgentRun:
             return self._settle(current)
         if only_human == "done":
             return self._end("finished", "no_more_sources")
+        chosen = f" The human chose {service} as the incident service." if service is not None else ""
         self._messages.append(Message(role="user", content=(
-            "The human has answered and reviewed the suggestions. Facts confirmed by a human are now used. "
-            "Check run_rules and look up what is still missing, or stop if nothing more can help.")))
+            "The human has answered and reviewed the suggestions. Facts confirmed by a human are now used."
+            f"{chosen} Look up what is still missing (see the status below), or stop if nothing more can help.")))
+        self._add_status(current)
         return self._loop()
 
     # ---------- the loop ----------
@@ -258,28 +285,7 @@ class AgentRun:
             if not response.tool_calls:
                 return self._settle()  # the LLM thinks it is done
 
-            limit_hit = time_hit = False
-            calls = response.tool_calls
-            replies: dict[int, dict] = {}
-            # Bug fix (C01 live test, approved by Sam on 11 November 2026): get_service runs first in an
-            # answer, because lookups only record facts for the incident service, which get_service sets.
-            # The other calls keep the order the LLM gave. The replies still go back in the LLM's order.
-            for index in sorted(range(len(calls)), key=lambda i: calls[i].name != "get_service"):
-                call = calls[index]
-                if time_hit or self._time_left() <= 0:
-                    time_hit = True
-                    replies[index] = {"error": "not run: time limit for this run reached"}
-                    continue
-                if self._tool_calls >= limits.max_tool_calls:
-                    limit_hit = True
-                    replies[index] = {"error": "not run: tool call limit for this run reached"}
-                    continue
-                if index >= limits.max_tool_calls_per_step:
-                    replies[index] = {"error": "not run: too many tool calls in one step"}
-                    continue
-                replies[index] = self._run_tool(call, by="llm")
-            for index, call in enumerate(calls):
-                self._reply(call, replies[index])
+            time_hit, limit_hit = self._run_answer(response.tool_calls)
             if time_hit:
                 return self._end("stopped", "time_limit")
             if limit_hit:
@@ -299,6 +305,74 @@ class AgentRun:
                 return self._settle(current)
             if only_human == "done":
                 return self._end("finished", "no_more_sources")
+            self._add_status(current)  # the run goes on: the LLM gets the engine's status for its next choice
+
+    def _run_answer(self, calls: tuple[ToolCall, ...]) -> tuple[bool, bool]:
+        """Run every tool call in one LLM answer. Returns (time limit hit, tool call limit hit).
+
+        A `lookups` call is unpacked into the lookups it lists; each one is run, logged and counted like a
+        single call. The per-answer limit counts single lookups in the LLM's order. Run order: get_service
+        first, then the outage timeline, then the rest in the LLM's order (tools.RUN_FIRST). Replies go back
+        in the LLM's order: one reply per call, and a `lookups` reply holds one result per listed lookup.
+        """
+        limits = self._limits
+        expanded: dict[int, list[ToolCall] | ToolOutcome] = {}
+        flat: list[tuple[int, int, ToolCall]] = []  # (call index, position in its lookups list, single call)
+        for index, call in enumerate(calls):
+            if call.name == "lookups":
+                expanded[index] = self._toolbox.expand(call)
+                if isinstance(expanded[index], list):
+                    flat += [(index, position, single) for position, single in enumerate(expanded[index])]
+            else:
+                flat.append((index, 0, call))
+        services = {c.arguments.get("service_id") for _, _, c in flat
+                    if c.name == "get_service" and c.arguments_valid and isinstance(c.arguments, dict)}
+        two_services = self._context.incident_service is None and len(services) > 1
+
+        results: dict[tuple[int, int], dict] = {}
+        time_hit = limit_hit = False
+        order = sorted(range(len(flat)), key=lambda n: RUN_FIRST.get(flat[n][2].name, len(RUN_FIRST)))
+        for n in order:
+            index, position, call = flat[n]
+            if time_hit or self._time_left() <= 0:
+                time_hit = True
+                results[index, position] = {"error": "not run: time limit for this run reached"}
+            elif self._tool_calls >= limits.max_tool_calls:
+                limit_hit = True
+                results[index, position] = {"error": "not run: tool call limit for this run reached"}
+            elif n >= limits.max_tool_calls_per_step:
+                results[index, position] = {"error": "not run: too many tool calls in one step"}
+            elif two_services and call.name == "get_service":
+                results[index, position] = {"error": TWO_SERVICES}
+                self._log.write("tool_call", by="llm", tool="get_service", arguments=call.arguments, ok=False,
+                                error="two services in one answer", facts_recorded=[], repeat=False,
+                                before_service=False)
+            else:
+                results[index, position] = self._run_tool(call, by="llm")
+        for index, call in enumerate(calls):
+            unpacked = expanded.get(index)
+            if isinstance(unpacked, ToolOutcome):  # a malformed lookups call: refused, nothing run
+                self._tool_path.append("lookups [refused]")
+                self._log.write("tool_call", by="llm", tool="lookups", arguments=call.arguments, ok=False,
+                                error=unpacked.error, facts_recorded=[], repeat=False, before_service=False)
+                content = unpacked.content
+            elif unpacked is not None:
+                content = {"results": [{"tool": single.name, **results[index, position]}
+                                       for position, single in enumerate(unpacked)]}
+            else:
+                content = results[index, 0]
+            self._messages.append(Message(role="tool", tool_call_id=call.call_id,
+                                          content=tool_message(content, self._code)))
+        return time_hit, limit_hit
+
+    def _add_status(self, current: Classification) -> None:
+        """Give the LLM the engine's status for its next choice. An older status is cut to one line."""
+        if self._last_status is not None:
+            old = self._messages[self._last_status]
+            self._messages[self._last_status] = old.model_copy(update={"content": OLD_STATUS})
+        self._last_status = len(self._messages)
+        content = rules_status(self._store, self._context, current)
+        self._messages.append(Message(role="user", content=STATUS_INTRO + tool_message(content, self._code)))
 
     def _run_tool(self, call: ToolCall, by: str) -> dict:
         """Run one tool call and log it. Returns what goes back to the LLM; the caller sends it."""
@@ -312,18 +386,6 @@ class AgentRun:
                         repeat=outcome.repeat, before_service=outcome.before_service)
         self._log_new_events()
         return outcome.content
-
-    def _reply(self, call: ToolCall, content: dict) -> None:
-        if call.name == "run_rules" and "where_to_find" in content:
-            # A new full run_rules answer replaces the last one, which is cut to a stub (shorter prompts,
-            # approved by Sam on 11 November 2026). The newest full answer always stays: a short "unchanged"
-            # answer refers to it. The decision log is not changed: it has every rules check.
-            if self._last_rules_reply is not None:
-                old = self._messages[self._last_rules_reply]
-                self._messages[self._last_rules_reply] = old.model_copy(
-                    update={"content": tool_message(OLD_RULES_STUB, self._code)})
-            self._last_rules_reply = len(self._messages)
-        self._messages.append(Message(role="tool", tool_call_id=call.call_id, content=tool_message(content, self._code)))
 
     def _rules_check(self) -> Classification:
         """Run the rules engine on the stored facts (plain code, hard rule 1) and log the result."""
@@ -424,7 +486,8 @@ class AgentRun:
         self._worked = self._seconds_used()
         self._segment_start = None
         conflicts = tuple(self._store.conflicts())
-        questions = tuple(_pending(name) for name in self._context.pending_questions) if status == "needs_human" else ()
+        questions = tuple(self._pending(name) for name in self._context.pending_questions) \
+            if status == "needs_human" else ()
         review = tuple(self._store.review_items()) if status == "needs_human" else ()
         message = {
             "final_result": f"Result: {classification.result}. {classification.summary}",
@@ -459,6 +522,15 @@ class AgentRun:
             tool_path=tuple(self._tool_path), steps_used=self._steps, tool_calls_used=self._tool_calls,
             human_rounds=self._human_rounds, seconds_used=round(self._worked, 1), trace=tuple(self._log.records),
         )
+
+    def _pending(self, name: str) -> PendingQuestion:
+        if name == SERVICE_QUESTION:
+            # Fixed wording; the choices are only the services find_service returned (names from the service list).
+            names = ", ".join(f"{sid} = {label}" for sid, label in self._context.candidates.items())
+            return PendingQuestion(fact_name=name, text=f"{SERVICE_QUESTION_TEXT} ({names})",
+                                   basis=SERVICE_QUESTION_BASIS, choices=tuple(self._context.candidates),
+                                   allows_estimate=False)
+        return _pending(name)
 
 
 def _pending(name: str) -> PendingQuestion:

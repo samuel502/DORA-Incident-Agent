@@ -144,3 +144,23 @@ def test_error_message_does_not_repeat_the_input():
         find_service(hostile)
     assert hostile not in str(caught.value)
     assert "ignore" not in str(caught.value)
+
+
+# ---------- several services named in one ticket (C01 live test, approved by Sam on 13 November 2026) ----------
+
+
+@pytest.mark.parametrize("text", ["online or mobile banking", "online and mobile banking",
+                                  "can't log into online or mobile banking"])
+def test_ticket_naming_online_and_mobile_banking_finds_both(text):
+    # C01: before the fix, "online or mobile banking" only found SVC-MOB, so the AI never saw SVC-OLB.
+    assert {"SVC-MOB", "SVC-OLB"} <= set(ids(find_service(text)))
+
+
+def test_all_words_of_an_alias_must_be_there_as_whole_words():
+    # "banking app" needs both words; "application" is not the word "app".
+    assert "SVC-MOB" not in ids(find_service("credit application banking"))
+    assert "SVC-MOB" in ids(find_service("the banking mobile app"))
+
+
+def test_one_word_of_a_two_word_alias_alone_still_works_as_before():
+    assert "SVC-OLB" in ids(find_service("online"))  # 3+ characters inside an alias, unchanged

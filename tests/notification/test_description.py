@@ -222,8 +222,7 @@ def b01_script():
              end="2026-05-27T00:00:00Z").tool_calls[0].model_copy(update={"call_id": "c1"}),
         call("get_daily_averages", service_id="SVC-OLB").tool_calls[0].model_copy(update={"call_id": "c2"}),
     ))
-    return [call("find_service", text="online banking"), call("get_service", service_id="SVC-OLB"), many,
-            call("run_rules")]
+    return [call("find_service", text="online banking"), call("get_service", service_id="SVC-OLB"), many]
 
 
 def test_injection_in_the_ticket_never_reaches_the_drafting_prompt():

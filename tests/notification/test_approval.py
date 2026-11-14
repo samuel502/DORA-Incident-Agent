@@ -293,8 +293,7 @@ def b01_script():
             call("get_outage_timeline", service_id="SVC-OLB"),
             call("get_client_impact", service_id="SVC-OLB", start="2026-05-26T00:00:00Z", end="2026-05-27T00:00:00Z"),
             call("get_daily_averages", service_id="SVC-OLB")))))
-    return [call("find_service", text="online banking"), call("get_service", service_id="SVC-OLB"), many,
-            call("run_rules")]
+    return [call("find_service", text="online banking"), call("get_service", service_id="SVC-OLB"), many]
 
 
 def test_b01_run_to_approved_notification():
