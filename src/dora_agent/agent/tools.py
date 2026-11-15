@@ -34,7 +34,7 @@ from dora_agent.agent import mapping
 from dora_agent.agent.fact_store import FactStore
 from dora_agent.agent.questions import QUESTIONS, SERVICE_QUESTION, SERVICE_QUESTION_TEXT
 from dora_agent.agent.values import ValueProblem
-from dora_agent.config import agent_limits
+from dora_agent.config import agent_limits, connector_limits
 from dora_agent.connectors import InvalidQuery
 from dora_agent.llm.provider import ToolCall, ToolSpec
 from dora_agent.rules import Classification, classify
@@ -53,8 +53,14 @@ class Args(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
 
+# Longest find_service text: config.toml [connectors] max_query_chars (500), long enough for the whole ticket
+# (C01 live test, 15 November 2026: the AI sent the full 169-character ticket and the old limit of 100 refused it).
+FIND_TEXT_CHARS = connector_limits().max_query_chars
+
+
 class FindServiceArgs(Args):
-    text: str = Field(min_length=1, max_length=100, description="A few words from the ticket")
+    text: str = Field(min_length=1, max_length=FIND_TEXT_CHARS,
+                      description="The ticket text, or the words naming the service")
 
 
 class ServiceArgs(Args):
@@ -80,8 +86,13 @@ class ImpactArgs(Args):
 
 
 class AlertArgs(Args):
-    start: str = TimeText
-    end: str = TimeText
+    """Same window hardening as ImpactArgs (C01 live test, approved by Sam on 15 November 2026): start and end
+    may be left out, and code picks the window (see _alert_window)."""
+
+    start: str | None = Field(default=None, min_length=1, max_length=40,
+                              description="ISO 8601 with zone. Leave out: code uses the known incident times")
+    end: str | None = Field(default=None, min_length=1, max_length=40,
+                            description="ISO 8601 with zone. Leave out: code uses the known incident times")
     service_id: str | None = Field(default=None, pattern=r"^SVC-[A-Z]{2,8}$")
 
 
@@ -276,6 +287,10 @@ class Toolbox:
         extra = None
         if name == "get_daily_averages":
             extra = _daily_averages_date(self)  # the date is chosen by code and can change during a run
+        elif name in _WINDOWS and (args.start is None or args.end is None):
+            # A window chosen by code follows the known incident times, which can change during a run.
+            # So the same call with a different window is a new lookup, not a repeat (15 November 2026).
+            extra = [_iso(t) for t in _WINDOWS[name](self, args)]
         return json.dumps([name, args.model_dump(mode="json"), extra], sort_keys=True, default=str)
 
     # ---------- helpers for handlers ----------
@@ -404,37 +419,55 @@ def _get_client_impact(box: Toolbox, args: ImpactArgs) -> ToolOutcome:
     return _ok("get_client_impact", content, recorded, note)
 
 
-# The longest window get_client_impact accepts (config.toml [connectors] max_impact_window_days is 366).
-_MAX_DEFAULT_WINDOW = timedelta(days=366)
-
-
 def _iso(value: Any) -> str:
     return value.isoformat() if isinstance(value, datetime) else str(value)
 
 
 def _impact_window(box: Toolbox, args: ImpactArgs) -> tuple[Any, Any]:
-    """The search window: what the LLM gave, else the known outage times (window hardening, Sam, 13 Nov 2026).
+    """The client impact search window: what the LLM gave, else the known outage times (Sam, 13 Nov 2026).
 
-    Start: the earliest known of incident start and downtime start. End: the latest known of service restored
-    and resolved. If one is not known yet: the reported time minus client_impact_default_days, or the later of
-    the reported time and the time of the check plus that many days. Plain code; it only picks where to look,
-    never what a record means. A window the LLM gives is used as it is (the connector checks it).
+    Never longer than the connector allows (config.toml [connectors] max_impact_window_days, 366).
+    """
+    return _default_window(box, args.start, args.end, lead=timedelta(0),
+                           longest=timedelta(days=connector_limits().max_impact_window_days))
+
+
+def _alert_window(box: Toolbox, args: AlertArgs) -> tuple[Any, Any]:
+    """The security alert search window: the same as for client impact (Sam, 15 November 2026), with two
+    differences the alert data needs:
+    - it starts gate_check_alert_days_before (7) days earlier, because an alert can come before the outage
+      (ALR-0003 was detected at 14:34, before the ATM downtime it belongs to started at 14:40);
+    - it is never longer than the alert search allows (config.toml max_alert_window_days, 31), because an
+      outage can last months (C01: February to May 2025).
+    """
+    return _default_window(box, args.start, args.end,
+                           lead=timedelta(days=agent_limits().gate_check_alert_days_before),
+                           longest=timedelta(days=connector_limits().max_alert_window_days))
+
+
+def _default_window(box: Toolbox, start: str | None, end: str | None, *, lead: timedelta,
+                    longest: timedelta) -> tuple[Any, Any]:
+    """A search window: what the LLM gave, else the known outage times (window hardening, Sam, 13 Nov 2026).
+
+    Start: the earliest known of incident start and downtime start, minus `lead`. End: the latest known of
+    service restored and resolved. If one is not known yet: the reported time minus client_impact_default_days
+    (and minus `lead`), or the later of the reported time and the time of the check plus that many days.
+    Plain code; it only picks where to look, never what a record means. A window the LLM gives is used as it
+    is (the connector checks it).
     """
     facts = box._store.snapshot()
     days = timedelta(days=box.impact_default_days)
     starts = [t for t in (facts.usable("incident_start"), facts.usable("downtime_start")) if t is not None]
     ends = [t for t in (facts.usable("service_restored_at"), facts.usable("resolved_at")) if t is not None]
-    if args.start is not None:
-        start = args.start
-    else:
-        start = min(starts) if starts else box.context.reported_at - days
-    if args.end is not None:
-        return start, args.end
+    if start is None:
+        start = (min(starts) if starts else box.context.reported_at - days) - lead
+    if end is not None:
+        return start, end
     end = max(ends) if ends else max(box.context.reported_at, box.context.as_of) + days
     begin = _as_time(start)  # a start the LLM gave is text; if it is not a valid time, the connector refuses it
     if begin is not None:
         # Never empty, never longer than the connector allows (a record overlapping the start is still found).
-        end = min(max(end, begin + timedelta(hours=1)), begin + _MAX_DEFAULT_WINDOW)
+        end = min(max(end, begin + timedelta(hours=1)), begin + longest)
     return start, end
 
 
@@ -465,13 +498,21 @@ def _daily_averages_date(box: Toolbox) -> str:
 
 
 def _get_security_alerts(box: Toolbox, args: AlertArgs) -> ToolOutcome:
-    result = connectors.get_security_alerts(args.start, args.end, args.service_id)
+    start, end = _alert_window(box, args)
+    result = connectors.get_security_alerts(start, end, args.service_id)
     box.context.alerts_checked = True
     service = box.context.incident_service
     relevant = [a for a in result.alerts if service is None or service in a.service_ids]
     # Alerts may be adopted before the service is known (case B03 starts with the SOC alert).
     recorded, note = box._offer_or_adopt("security_alert", relevant, lambda a: a.alert_id, mapping.map_alert, True)
-    return _ok("get_security_alerts", _dump(result), recorded, note)
+    content = _dump(result)
+    if args.start is None or args.end is None:
+        content["window_used"] = {"start": _iso(start), "end": _iso(end)}  # where code looked
+    return _ok("get_security_alerts", content, recorded, note)
+
+
+# Lookups whose window code picks when the LLM leaves it out (used for the repeat check above).
+_WINDOWS = {"get_client_impact": _impact_window, "get_security_alerts": _alert_window}
 
 
 def _get_suppliers_for_service(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
@@ -647,6 +688,13 @@ def where_to_find(missing: tuple[str, ...]) -> dict[str, list[str]]:
     return grouped
 
 
+# C01 live test (approved by Sam on 15 November 2026): the AI ran the outage timeline and client impact
+# before get_service, so they recorded nothing. The status says so while no service is chosen. Comparing
+# several services find_service returned (SEVERAL_NOTE) still needs these lookups, so it stays allowed.
+NO_SERVICE_YET = ("not chosen yet: get_service first. Until then get_outage_timeline, get_client_impact and "
+                  "get_daily_averages record nothing: do not run them, except to compare several services "
+                  "find_service returned.")
+
 UNCHANGED_NOTE = ("no fact changed since the last status: same result, same missing facts. Use that "
                   "status's where_to_find, or ask_human, or stop.")
 
@@ -670,7 +718,7 @@ def status(store: FactStore, context: RunContext, result: Classification | None 
     context.status_seen = seen
     content = {
         "result": result.result,
-        "incident_service": context.incident_service or "not chosen yet: get_service",
+        "incident_service": context.incident_service or NO_SERVICE_YET,
         "thresholds_met": list(result.thresholds_met),
         "check_first": check_first(result),
         # Every missing fact is in where_to_find (a test checks), so a separate "missing" list is not sent.
@@ -753,9 +801,11 @@ LOOKUPS_SPEC = ToolSpec(
     name="lookups",
     description=(
         "Read-only bank lookups. List ALL you need now in one call (up to 6); they run in one step. "
-        "find_service {text}; get_service {service_id}; get_outage_timeline {service_id, around?, window_hours?}; "
-        "get_client_impact {service_id, start?, end?} (leave the window out: code uses the outage times); "
-        "get_daily_averages {service_id}; get_security_alerts {start, end, service_id?}; "
+        f"find_service {{text}} (the ticket text, up to {FIND_TEXT_CHARS} characters); "
+        "get_service {service_id}; get_outage_timeline {service_id, around?, window_hours?}; "
+        "get_client_impact {service_id, start?, end?}; get_security_alerts {start?, end?, service_id?} "
+        "(for both, leave the window out: code uses the incident times); "
+        "get_daily_averages {service_id}; "
         "get_suppliers_for_service {service_id}; get_supplier {supplier_id}; "
         "get_supplier_notices {supplier_id, start, end}. Times: ISO 8601 with zone."),
     parameters={

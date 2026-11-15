@@ -132,7 +132,7 @@ def test_get_service_rejects_bad_ids(bad):
         get_service(bad)
 
 
-@pytest.mark.parametrize("bad", ["", "   ", "x" * 101, "<script>alert(1)</script>", "ignore {rules}", None, 7])
+@pytest.mark.parametrize("bad", ["", "   ", "x" * 501, "<script>alert(1)</script>", "ignore {rules}", None, 7])
 def test_find_service_rejects_bad_queries(bad):
     with pytest.raises(InvalidQuery):
         find_service(bad)
@@ -164,3 +164,60 @@ def test_all_words_of_an_alias_must_be_there_as_whole_words():
 
 def test_one_word_of_a_two_word_alias_alone_still_works_as_before():
     assert "SVC-OLB" in ids(find_service("online"))  # 3+ characters inside an alias, unchanged
+
+
+# ---------- the exact C01 ticket (live test, 15 November 2026) ----------
+
+C01_TICKET = ("Since the platform migration on Saturday night (15 Feb, 22:00), customers can't log into online "
+              "or mobile banking and payments fail. Call centre queues are over an hour.")
+C01_AI_TEXT = "customers can't log into online or mobile banking and payments fail"  # what the AI sent
+
+
+def test_c01_ticket_is_exactly_the_live_one():
+    assert len(C01_TICKET) == 169
+
+
+@pytest.mark.parametrize("text", [C01_TICKET, C01_AI_TEXT])
+def test_c01_ticket_finds_online_and_mobile_banking_first(text):
+    # The services named by two words ("online banking", "mobile banking") come before the ones that only
+    # share the word "payments". Before the fix the list was in service-ID order and cut at the limit.
+    found = ids(find_service(text))
+    assert found[:2] == ["SVC-MOB", "SVC-OLB"]
+
+
+@pytest.mark.parametrize("text", [C01_TICKET, C01_AI_TEXT])
+def test_c01_online_banking_survives_a_small_result_limit(monkeypatch, text):
+    # Why the earlier tests missed it: they searched short texts like "online or mobile banking", which match
+    # only two services, so the cut-off never mattered. With "payments" in the text, five or six services
+    # match. In ID order and a cut-off of 3, the list was CARD, HVP, MOB: what the live run showed.
+    from dataclasses import replace
+
+    from dora_agent.config import connector_limits
+    from dora_agent.connectors import services
+
+    small = replace(connector_limits(), max_find_results=3)
+    monkeypatch.setattr(services, "connector_limits", lambda: small)
+    result = find_service(text)
+    assert {"SVC-MOB", "SVC-OLB"} <= set(ids(result))
+    assert result.more_available is True
+
+
+def test_full_c01_ticket_is_accepted_and_names_the_phone_service_too():
+    found = ids(find_service(C01_TICKET))  # 169 characters: refused before (limit was 100)
+    assert {"SVC-MOB", "SVC-OLB", "SVC-PHONE"} <= set(found[:3])  # "call centre" is a two-word alias too
+
+
+def test_search_text_limit_fits_the_longest_sample_ticket():
+    import json
+
+    from dora_agent.config import PROJECT_ROOT, connector_limits
+
+    samples = json.loads((PROJECT_ROOT / "cases" / "samples.json").read_text(encoding="utf-8"))
+    items = samples if isinstance(samples, list) else next(v for v in samples.values() if isinstance(v, list))
+    for sample in items:
+        assert len(sample["ticket"]) <= connector_limits().max_query_chars, sample["sample_id"]
+        assert find_service(sample["ticket"]) is not None  # no sample ticket is refused
+
+
+def test_one_word_matches_keep_service_id_order():
+    assert ids(find_service("payments")) == sorted(ids(find_service("payments")))

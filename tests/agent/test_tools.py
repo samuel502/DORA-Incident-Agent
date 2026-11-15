@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import pytest
 
 from dora_agent.agent.fact_store import FactStore
-from dora_agent.agent.tools import UNCHANGED_NOTE, RunContext, Toolbox, status
+from dora_agent.agent.tools import FIND_TEXT_CHARS, NO_SERVICE_YET, UNCHANGED_NOTE, RunContext, Toolbox, status
 from dora_agent.llm.fake_provider import call
 from dora_agent.llm.provider import ToolCall
 
@@ -376,7 +376,7 @@ def test_tool_specs_sent_to_the_llm_are_slim_but_limits_still_apply():
         keys = set(_all_keys(spec.parameters))
         assert not keys & {"title", "minLength", "maxLength", "minItems", "maxItems"}, spec.name
     # The limits are still checked in code, against the full argument models.
-    assert run(box, "find_service", text="x" * 101).error.startswith("invalid arguments")
+    assert run(box, "find_service", text="x" * (FIND_TEXT_CHARS + 1)).error.startswith("invalid arguments")
     assert run(box, "ask_human", facts=["media_coverage"] * 21).error.startswith("invalid arguments")
     assert run(box, "get_service", service_id="online banking").error.startswith("invalid arguments")
 
@@ -690,6 +690,87 @@ def test_default_window_is_never_longer_than_the_connector_allows():
 
 def test_status_says_which_service_is_the_incident_service():
     box, _ = box_at(C01_REPORTED)
-    assert rules(box)["incident_service"] == "not chosen yet: get_service"
+    assert rules(box)["incident_service"] == NO_SERVICE_YET
     run(box, "get_service", service_id="SVC-OLB")
     assert rules(box)["incident_service"] == "SVC-OLB"
+
+
+# ---------- C01 live test, 15 November 2026: full ticket, alert window, status before get_service ----------
+
+C01_TICKET = ("Since the platform migration on Saturday night (15 Feb, 22:00), customers can't log into online "
+              "or mobile banking and payments fail. Call centre queues are over an hour.")
+
+
+def test_find_service_accepts_the_full_c01_ticket_through_lookups():
+    box, _ = box_at(C01_REPORTED)
+    singles = box.expand(call("lookups", calls=[{"tool": "find_service", "args": {"text": C01_TICKET}}]).tool_calls[0])
+    outcome = box.run(singles[0])
+    assert outcome.ok, outcome.error
+    found = [m["service_id"] for m in outcome.content["matches"]]
+    assert "SVC-OLB" in found and "SVC-MOB" in found
+    assert set(box.context.candidates) >= {"SVC-OLB", "SVC-MOB"}  # both can be offered in the service question
+
+
+def test_lookups_description_tells_the_ai_the_search_text_limit():
+    from dora_agent.agent.tools import LOOKUPS_SPEC
+
+    assert f"up to {FIND_TEXT_CHARS} characters" in LOOKUPS_SPEC.description
+    assert "get_security_alerts {start?, end?, service_id?}" in LOOKUPS_SPEC.description
+
+
+def test_security_alerts_without_a_window_are_not_refused():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    outcome = run(box, "get_security_alerts", service_id="SVC-OLB")
+    assert outcome.ok, outcome.error
+    # No outage times yet: reported time minus 7 days (client_impact_default_days) minus 7 more
+    # (gate_check_alert_days_before), to reported time plus 7 days.
+    assert outcome.content["window_used"] == {"start": "2025-02-01T21:00:00+00:00", "end": "2025-02-22T21:00:00+00:00"}
+    assert box.context.alerts_checked
+
+
+def test_security_alerts_without_a_window_follow_the_outage_times_but_stay_within_31_days():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    run(box, "get_outage_timeline", service_id="SVC-OLB")  # PRB-0002: 15 Feb to 31 Jul 2025
+    outcome = run(box, "get_security_alerts", service_id="SVC-OLB")
+    assert outcome.ok, outcome.error
+    # Start 7 days before the incident start; the outage lasts months, so the end is cut at start + 31 days.
+    assert outcome.content["window_used"] == {"start": "2025-02-08T21:00:00+00:00", "end": "2025-03-11T21:00:00+00:00"}
+
+
+def test_alert_detected_just_before_the_outage_is_still_found():
+    # ALR-0003 was detected before the ATM outage started. A window starting at the outage start
+    # would miss it; the 7-day lead finds it.
+    box, store = box_at(datetime(2026, 4, 30, 15, 0, tzinfo=UTC))
+    run(box, "get_service", service_id="SVC-ATM")
+    run(box, "get_outage_timeline", service_id="SVC-ATM")
+    # PRB-0015: downtime starts 14:40; ALR-0003 was detected at 14:34, six minutes earlier.
+    assert store.snapshot().usable("downtime_start") == datetime(2026, 4, 30, 14, 40, tzinfo=UTC)
+    outcome = run(box, "get_security_alerts", service_id="SVC-ATM")
+    assert "ALR-0003" in [a["alert_id"] for a in outcome.content["alerts"]]
+
+
+def test_a_window_the_llm_gives_for_alerts_is_used_as_given():
+    box, _ = box_at(C01_REPORTED)
+    outcome = run(box, "get_security_alerts", start="2025-02-15T00:00:00Z", end="2025-02-16T00:00:00Z")
+    assert outcome.ok and "window_used" not in outcome.content
+
+
+def test_defaulted_window_that_moved_is_a_new_lookup_not_a_repeat():
+    box, _ = box_at(C01_REPORTED)
+    run(box, "get_service", service_id="SVC-OLB")
+    first = run(box, "get_security_alerts", service_id="SVC-OLB")
+    run(box, "get_outage_timeline", service_id="SVC-OLB")  # the known times change the window
+    second = run(box, "get_security_alerts", service_id="SVC-OLB")
+    assert not second.repeat and second.content["window_used"] != first.content["window_used"]
+    third = run(box, "get_security_alerts", service_id="SVC-OLB")  # nothing changed since: a repeat
+    assert third.repeat
+
+
+def test_status_before_get_service_says_not_to_run_service_bound_lookups():
+    box, _ = box_at(C01_REPORTED)
+    text = rules(box)["incident_service"]
+    for name in ("get_outage_timeline", "get_client_impact", "get_daily_averages"):
+        assert name in text
+    assert "record nothing" in text and "get_service first" in text
