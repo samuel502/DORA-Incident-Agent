@@ -180,6 +180,13 @@ class RunContext:
     # The facts (and conflicts) the LLM's last FULL status was based on. If nothing changed since, the status
     # is short (block 6, C01 live test, approved by Sam on 11 November 2026).
     status_seen: str | None = None
+    # Lookups the LLM ran before any service was chosen, which recorded nothing: (tool, checked arguments).
+    # When get_service sets the service, code repeats the ones for that service (loop.py), so their facts are
+    # recorded without an extra AI step (C01 live test, approved by Sam on 15 November 2026).
+    early_lookups: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+    # Every value a bank system returned in this run, recorded or not: fact name -> [(value, where)].
+    # Used only to label an AI suggestion with the same value as system data, never as a fact.
+    system_values: dict[str, list[tuple[Any, str]]] = field(default_factory=dict)
 
     def queue_question(self, name: str) -> bool:
         """Queue a fixed question unless it was already asked in this run. True if it was queued."""
@@ -272,6 +279,10 @@ class Toolbox:
             # Bug fix (C01 live test, approved by Sam on 11 November 2026): this result recorded nothing
             # only because the service was not known yet. So it is not remembered and does not count as
             # done: the same call after get_service runs again and records the facts.
+            if outcome.ok:
+                early = (call.name, args.model_dump(mode="json"))
+                if early not in self.context.early_lookups:
+                    self.context.early_lookups.append(early)
             return outcome.model_copy(update={"before_service": True})
         if outcome.ok and call.name in LOOKUPS:
             self.context.lookups_done.add((call.name, getattr(args, "service_id", None)))
@@ -279,6 +290,44 @@ class Toolbox:
                 self.context.remembered[key] = {k: v for k, v in outcome.content.items()
                                                 if k not in ("note", "facts_recorded")}
         return outcome
+
+    def early_lookups_for(self, service_id: str, skip: list[ToolCall]) -> list[ToolCall]:
+        """The lookups the LLM ran for this service before it was chosen, to be run again by code.
+
+        C01 live test (approved by Sam on 15 November 2026): the AI checked every candidate service first,
+        which recorded nothing, then chose one with get_service. Code now repeats those same read-only calls
+        for the chosen service, with the same arguments, so their facts are recorded at once. The LLM still
+        chose every lookup. Calls in `skip` (the LLM asked for them again in the same answer) are left out,
+        so nothing runs twice. Run order: the outage timeline first (RUN_FIRST), then the LLM's order.
+        """
+        skipped = [_checked(self._tools, c) for c in skip]
+        found = [(name, args) for name, args in self.context.early_lookups
+                 if args.get("service_id") == service_id and (name, args) not in skipped]
+        found.sort(key=lambda item: RUN_FIRST.get(item[0], len(RUN_FIRST)))
+        return [ToolCall(call_id=f"early-{i}", name=name, arguments=dict(args),
+                         raw_arguments=json.dumps(args, default=str)[:500])
+                for i, (name, args) in enumerate(found)]
+
+    def note_system_values(self, mapper: Callable[[FactStore, Any], list[str]], record: Any, where: str) -> None:
+        """Remember what a bank record says, through the same mapping code, into a scratch store only.
+
+        Nothing here becomes a fact. It lets plain code tell when an AI suggestion repeats a value a system
+        returned (for example a record of a service not chosen yet), so it is not labelled as read from
+        the ticket (C01 live test, approved by Sam on 15 November 2026).
+        """
+        scratch = FactStore()
+        mapper(scratch, record)
+        facts = scratch.snapshot()
+        for name in type(facts).model_fields:
+            fact = getattr(facts, name)
+            if name != "service_id" and fact.known:
+                seen = self.context.system_values.setdefault(name, [])
+                if all(value != fact.value for value, _ in seen):
+                    seen.append((fact.value, where))
+
+    def seen_in_system(self, name: str, value: Any) -> str | None:
+        """Where a bank system returned this same value in this run, or None."""
+        return next((where for seen, where in self.context.system_values.get(name, ()) if seen == value), None)
 
     def _memory_key(self, name: str, args: Args) -> str | None:
         """Key for remembering a read-only lookup: tool name plus exact arguments. None = never remembered."""
@@ -336,6 +385,17 @@ RUN_RULES_GONE = ("run_rules is not a tool: the rules engine runs after every st
 RUN_FIRST = {"get_service": 0, "get_outage_timeline": 1}
 
 
+def _checked(tools: dict, call: ToolCall) -> tuple[str, dict] | None:
+    """A call's tool name and checked arguments, as stored in early_lookups; None if it does not check."""
+    tool = tools.get(call.name)
+    if tool is None or not call.arguments_valid:
+        return None
+    try:
+        return call.name, tool.args.model_validate(call.arguments).model_dump(mode="json")
+    except ValidationError:
+        return None
+
+
 def _refused(tool: str, reason: str) -> ToolOutcome:
     return ToolOutcome(tool=tool, ok=False, content={"error": reason}, error=reason)
 
@@ -372,9 +432,10 @@ def _for_llm(node):
 
 
 SEVERAL_NOTE = ("several services match. Before get_service, check each of them in one lookups call "
-                "(get_outage_timeline and get_client_impact for each). Then call get_service for the service whose "
-                "records show this incident. If the records do not tell them apart, call ask_human with "
-                f'["{SERVICE_QUESTION}"].')
+                "(get_outage_timeline and get_client_impact for each). Then call get_service for exactly ONE "
+                "service, the one whose records show this incident: code then records the facts from the lookups "
+                "you already ran for it, so do not run them again. If the records do not tell them apart, call "
+                f'ask_human with ["{SERVICE_QUESTION}"].')
 
 
 def _find_service(box: Toolbox, args: FindServiceArgs) -> ToolOutcome:
@@ -389,6 +450,7 @@ def _get_service(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
     result = connectors.get_service(args.service_id)
     if not result.found:
         return _ok("get_service", _dump(result), note="service not found")
+    box.note_system_values(mapping.map_service, result.service, f"the service list ({args.service_id})")
     if box.context.incident_service is None:
         box.context.incident_service = args.service_id
         recorded = mapping.map_service(box._store, result.service)
@@ -402,6 +464,8 @@ def _get_service(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
 def _get_outage_timeline(box: Toolbox, args: TimelineArgs) -> ToolOutcome:
     around = args.around or box.context.reported_at
     result = connectors.get_outage_timeline(args.service_id, around, args.window_hours)
+    for problem in result.problems:
+        box.note_system_values(mapping.map_problem, problem, f"monitoring ({problem.problem_id}, {args.service_id})")
     recorded, note = box._offer_or_adopt("monitoring", list(result.problems), lambda p: p.problem_id,
                                          mapping.map_problem, box._is_incident_service(args.service_id))
     return _ok("get_outage_timeline", _dump(result), recorded, note)
@@ -410,6 +474,8 @@ def _get_outage_timeline(box: Toolbox, args: TimelineArgs) -> ToolOutcome:
 def _get_client_impact(box: Toolbox, args: ImpactArgs) -> ToolOutcome:
     start, end = _impact_window(box, args)
     result = connectors.get_client_impact(args.service_id, start, end)
+    for impact in result.impacts:
+        box.note_system_values(mapping.map_impact, impact, f"client data ({impact.impact_id}, {args.service_id})")
     recorded, note = box._offer_or_adopt("client_impact", list(result.impacts), lambda i: i.impact_id,
                                          mapping.map_impact, box._is_incident_service(args.service_id))
     content = _dump(result)
@@ -484,6 +550,7 @@ def _as_time(value: Any) -> datetime | None:
 def _get_daily_averages(box: Toolbox, args: ServiceArgs) -> ToolOutcome:
     # The date is chosen by plain code, not the LLM: the incident's earliest known time, else the reported time.
     result = connectors.get_daily_averages(args.service_id, _daily_averages_date(box))
+    box.note_system_values(mapping.map_daily_averages, result, f"client data (daily averages, {args.service_id})")
     if box.context.incident_service is None:
         return _ok("get_daily_averages", _dump(result), note=NOT_YET_NOTE)
     if not box._is_incident_service(args.service_id):
@@ -501,6 +568,8 @@ def _get_security_alerts(box: Toolbox, args: AlertArgs) -> ToolOutcome:
     start, end = _alert_window(box, args)
     result = connectors.get_security_alerts(start, end, args.service_id)
     box.context.alerts_checked = True
+    for alert in result.alerts:
+        box.note_system_values(mapping.map_alert, alert, f"security alerts ({alert.alert_id})")
     service = box.context.incident_service
     relevant = [a for a in result.alerts if service is None or service in a.service_ids]
     # Alerts may be adopted before the service is known (case B03 starts with the SOC alert).
@@ -557,7 +626,8 @@ def _suggest_facts(box: Toolbox, args: SuggestArgs) -> ToolOutcome:
             refused.append(s.fact[:60])
             continue
         try:
-            results.append(box._view.suggest(s.fact, s.value, s.reason))
+            # Plain code, not the LLM, says whether a bank system returned this same value in this run.
+            results.append(box._view.suggest(s.fact, s.value, s.reason, seen_in_system=box.seen_in_system))
         except ValueProblem as problem:
             results.append(f"{s.fact[:60]}: not stored ({problem})")
     if not results:
@@ -694,6 +764,21 @@ def where_to_find(missing: tuple[str, ...]) -> dict[str, list[str]]:
 NO_SERVICE_YET = ("not chosen yet: get_service first. Until then get_outage_timeline, get_client_impact and "
                   "get_daily_averages record nothing: do not run them, except to compare several services "
                   "find_service returned.")
+# After the candidate check (C01 live test, approved by Sam on 15 November 2026): the AI had checked all the
+# candidates, then sent get_service for two of them, which was refused. The status now says what to do next.
+CHOOSE_ONE = ("not chosen yet. You have checked the services find_service returned. Now call get_service for "
+              "exactly ONE service: the one whose records show this incident (get_service for two services is "
+              "refused). Code then records the facts from the lookups you already ran for it: do not run them "
+              f'again. If the records do not tell them apart, call ask_human with ["{SERVICE_QUESTION}"].')
+
+
+def _service_status(context: RunContext) -> str:
+    """The incident service for the status, or what to do while none is chosen."""
+    if context.incident_service is not None:
+        return context.incident_service
+    if len(context.candidates) > 1 and context.early_lookups:
+        return CHOOSE_ONE
+    return NO_SERVICE_YET
 
 UNCHANGED_NOTE = ("no fact changed since the last status: same result, same missing facts. Use that "
                   "status's where_to_find, or ask_human, or stop.")
@@ -711,14 +796,17 @@ def status(store: FactStore, context: RunContext, result: Classification | None 
     conflicts = [c.describe() for c in store.conflicts()]
     # Same facts and conflicts in, same result out: the engine is plain code (hard rule 1). So the full
     # status, which the LLM already has, is not sent again. The result word is always sent.
-    seen = json.dumps([facts.model_dump(mode="json"), conflicts, context.incident_service],
-                      sort_keys=True, default=str)
+    service = _service_status(context)
+    seen = json.dumps([facts.model_dump(mode="json"), conflicts, service], sort_keys=True, default=str)
     if seen == context.status_seen:
-        return {"result": result.result, "unchanged": True, "note": UNCHANGED_NOTE}
+        short = {"result": result.result, "unchanged": True, "note": UNCHANGED_NOTE}
+        if context.incident_service is None:
+            short["incident_service"] = service  # what to do next is always sent while no service is chosen
+        return short
     context.status_seen = seen
     content = {
         "result": result.result,
-        "incident_service": context.incident_service or NO_SERVICE_YET,
+        "incident_service": service,
         "thresholds_met": list(result.thresholds_met),
         "check_first": check_first(result),
         # Every missing fact is in where_to_find (a test checks), so a separate "missing" list is not sent.

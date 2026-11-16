@@ -27,8 +27,9 @@ YOUR JOB
 - One service matches: in one lookups call, get_service for it plus the lookups for the missing facts
   (get_outage_timeline, get_client_impact, get_daily_averages, get_security_alerts). get_service runs first.
 - Several services match: first check each one in one lookups call (get_outage_timeline and
-  get_client_impact for each). Then get_service for the service whose records show this incident, with its
-  lookups. If the records do not tell them apart, ask_human with ["incident_service"]: a human picks.
+  get_client_impact for each). Then get_service for exactly ONE service, the one whose records show this
+  incident. Code then records the facts from the lookups you already ran for it: do not run them again.
+  If the records do not tell them apart, ask_human with ["incident_service"]: a human picks.
 - After every step you get a status from the rules engine. Choose your next tools from it, not from a fixed
   order: facts in check_first come first (if they settle it, nothing else matters), then the rest.
   where_to_find lists, for each tool, the missing facts it can supply. Skip lookups that supply none.

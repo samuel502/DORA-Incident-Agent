@@ -72,12 +72,16 @@ class Conflict(Frozen):
 
 
 class ReviewItem(Frozen):
-    """One suggestion read from the ticket, waiting for the human's review."""
+    """One AI suggestion, waiting for the human's review."""
 
     fact_name: str
     suggested_value: Any
     reason: str
     question: str | None  # the fixed question text, if there is one, to help the human
+    # Set by plain code when the suggested value is the same as a value a bank system returned in this run
+    # (for example a record of a service that was not chosen yet). Then the value did not come from the
+    # ticket, and the page says so (C01 live test, approved by Sam on 15 November 2026).
+    seen_in_system: str | None = None
 
 
 class ReviewDecision(Frozen):
@@ -119,6 +123,8 @@ class FactStore:
         self._events: list[FactEvent] = []
         # The latest value each system reported, even when a human answer is kept instead (for conflicts).
         self._system_values: dict[str, tuple[Any, str]] = {}
+        # Suggestions whose value a bank system also returned: fact name -> which system and record.
+        self._seen_in_system: dict[str, str] = {}
 
     # ---------- reading ----------
 
@@ -156,7 +162,8 @@ class FactStore:
             if fact.source == "ai_suggestion" and fact.confirmed_by is None:
                 question = question_for(name).text if _has_question(name) else None
                 items.append(ReviewItem(fact_name=name, suggested_value=fact.value,
-                                        reason=fact.note or "", question=question))
+                                        reason=fact.note or "", question=question,
+                                        seen_in_system=self._seen_in_system.get(name)))
         return items
 
     def agent_view(self) -> "AgentFactView":
@@ -188,11 +195,15 @@ class FactStore:
             return
         self._facts[name] = _make(name, value=value, source=source, is_estimate=is_estimate,
                                   note=_clean(note, 500) if note else None)
+        self._seen_in_system.pop(name, None)  # a suggestion it replaced is gone
         self._event(name, "system", value, source, None)
 
     # ---------- door 2: the LLM's suggestions (through AgentFactView) ----------
 
-    def _record_suggestion(self, name: str, raw: Any, reason: str) -> str:
+    def _record_suggestion(self, name: str, raw: Any, reason: str,
+                           seen_in_system: Any = None) -> str:
+        """seen_in_system: plain code passes a function that says which bank system returned this same value
+        in this run (or None). The LLM never sets it: it only sends fact, value and reason."""
         value = parse_value(name, raw)  # raises ValueProblem with a plain message
         reason = _clean(str(reason), MAX_REASON_CHARS) or "no reason given"
         current = self._facts.get(name)
@@ -201,7 +212,16 @@ class FactStore:
                         f"already known from {current.source}")
             return f"{name}: already known from {current.source}; suggestion not stored"
         self._facts[name] = _make(name, value=value, source="ai_suggestion", note=reason)
-        self._event(name, "suggested", value, "ai_suggestion", None, reason)
+        seen = seen_in_system(name, value) if seen_in_system else None
+        if seen:
+            self._seen_in_system[name] = _clean(seen, 200)
+        else:
+            self._seen_in_system.pop(name, None)
+        self._event(name, "suggested", value, "ai_suggestion", None,
+                    f"{reason} [same value as {seen}]" if seen else reason)
+        if seen:
+            return (f"{name}: suggestion stored; this value is the same as in {seen}, not from the ticket. "
+                    "A human will confirm or correct it")
         return f"{name}: suggestion stored; a human will confirm or correct it"
 
     # ---------- door 3: the human (through HumanDesk) ----------
@@ -244,7 +264,18 @@ class FactStore:
         events = []
         for decision, corrected in planned:
             name, item = decision.fact_name, pending[decision.fact_name]
-            if decision.action == "confirm":
+            self._seen_in_system.pop(name, None)
+            if decision.action == "confirm" and item.seen_in_system:
+                # The value came from a bank system, not the ticket (C01 live test, Sam, 15 November 2026):
+                # never labelled "ticket". A person confirmed it, so the source is "human"; the note says
+                # which system and record the value matches.
+                note = f"suggested by the AI; same value as {item.seen_in_system}; confirmed by a person"
+                self._facts[name] = _make(name, value=item.suggested_value, source="human",
+                                          confirmed_by=confirmed_by, is_estimate=decision.is_estimate,
+                                          note=_clean(note, 500))
+                events.append(self._event(name, "confirmed", item.suggested_value, "human", confirmed_by, note))
+                self._flag_conflict(name)
+            elif decision.action == "confirm":
                 # Confirmed reading of the ticket: source is the ticket, the reason is kept as a note.
                 self._facts[name] = _make(name, value=item.suggested_value, source="ticket",
                                           confirmed_by=confirmed_by, is_estimate=decision.is_estimate,
@@ -309,10 +340,13 @@ class AgentFactView:
     def review_items(self) -> list[ReviewItem]:
         return self._store.review_items()
 
-    def suggest(self, fact_name: str, value: Any, reason: str) -> str:
-        """Store a suggestion read from the ticket. Returns a short message for the LLM."""
+    def suggest(self, fact_name: str, value: Any, reason: str, *, seen_in_system: Any = None) -> str:
+        """Store an AI suggestion. Returns a short message for the LLM.
+
+        seen_in_system is passed by plain code in the toolbox (tools.py), never from the LLM's arguments.
+        """
         kind_of(fact_name)  # unknown fact names are refused with a plain message
-        return self._store._record_suggestion(fact_name, value, reason)
+        return self._store._record_suggestion(fact_name, value, reason, seen_in_system)
 
 
 class HumanDesk:

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import pytest
 
 from dora_agent.agent.fact_store import ReviewDecision
-from dora_agent.agent.loop import OLD_STATUS, STATUS_INTRO, AgentRun, RunProblem
+from dora_agent.agent.loop import EARLY_BY, OLD_STATUS, STATUS_INTRO, AgentRun, RunProblem
 from dora_agent.config import agent_limits
 from dora_agent.llm.fake_provider import FakeProvider, call, say
 from dora_agent.llm.provider import LlmError, LlmResponse, ToolCall
@@ -728,8 +728,10 @@ def test_c01_lookup_repeated_after_get_service_records_the_facts():
     assert result.classification.result == "major"
     assert result.classification.facts.affected_clients.value == 520000
     calls = [r for r in result.trace if r["kind"] == "tool_call" and r["tool"] == "get_client_impact"]
-    assert [(r["before_service"], r["repeat"], bool(r["facts_recorded"])) for r in calls] == [
-        (True, False, False), (False, False, True)]
+    # Since 15 November 2026 (Sam): code repeats the early call as soon as get_service sets the service, so
+    # the facts are recorded in step 2. The AI's own repeat in step 3 is then answered from memory.
+    assert [(r["by"], r["before_service"], r["repeat"], bool(r["facts_recorded"])) for r in calls] == [
+        ("llm", True, False, False), (EARLY_BY, False, False, True), ("llm", False, True, False)]
 
 
 def test_ask_human_with_mixed_facts_pauses_for_the_ones_with_questions():
@@ -943,3 +945,144 @@ def test_injected_ticket_text_cannot_add_a_service_choice():
                          call("ask_human", facts=[SERVICE_QUESTION])])
     paused = AgentRun(ticket, t(C01_AT), fake).start()
     assert paused.questions[0].choices == ("SVC-MOB", "SVC-OLB")
+
+
+# ---------- earlier lookups recorded when the service is chosen (C01 live test, Sam, 15 November 2026) ----------
+
+from dora_agent.agent.tools import CHOOSE_ONE  # noqa: E402
+from dora_agent.ui import views  # noqa: E402
+
+C01_CANDIDATES = ("SVC-MOB", "SVC-OLB", "SVC-PHONE", "SVC-CARD", "SVC-HVP")
+
+
+def c01_live_sequence():
+    """The exact sequence of the live C01 run on 15 November 2026 (7 steps, 187 s before the fix)."""
+    return [
+        # Step 1: the AI sent the whole ticket to the service search: 5 candidates.
+        lookups(("find_service", {"text": C01_TICKET})),
+        # Step 2: the outage timeline for all 5 candidates (records nothing: no service yet).
+        lookups(*[("get_outage_timeline", {"service_id": s, "around": C01_AT}) for s in C01_CANDIDATES]),
+        # Step 3: client impact for all 5 candidates (records nothing).
+        lookups(*[("get_client_impact", {"service_id": s}) for s in C01_CANDIDATES]),
+        # Step 4: get_service for two services: refused.
+        lookups(("get_service", {"service_id": "SVC-MOB"}), ("get_service", {"service_id": "SVC-OLB"})),
+        # Step 5: get_service for SVC-OLB alone, WITHOUT repeating the timeline and client impact.
+        lookups(("get_service", {"service_id": "SVC-OLB"})),
+        # Step 6 (live run): the AI suggested the bank system values. Must no longer be needed.
+        call("suggest_facts", suggestions=[
+            {"fact": "affected_clients", "value": 520000, "reason": "client impact record"},
+            {"fact": "service_restored_at", "value": "2025-05-23T15:00:00Z", "reason": "monitoring"}]),
+        say("done"),
+    ]
+
+
+def test_c01_live_sequence_records_earlier_lookups_when_the_service_is_chosen():
+    fake = FakeProvider(c01_live_sequence())
+    result = AgentRun(C01_TICKET, t(C01_AT), fake).start()
+    # The run ends at step 5 with the engine's result: no step 6, no suggestion, no human round.
+    assert (result.status, result.stop_reason, result.classification.result) == ("finished", "final_result", "major")
+    assert result.steps_used == 5 and len(fake.calls) == 5 and result.human_rounds == 0
+    assert result.review_items == () and result.questions == ()
+
+    facts = result.classification.facts
+    assert facts.service_id == "SVC-OLB"
+    # Bank system data, recorded with the system as the source (never a suggestion, never "ticket").
+    assert (facts.affected_clients.value, facts.affected_clients.source) == (520000, "client_data")
+    assert (facts.service_restored_at.value, facts.service_restored_at.source) == (t("2025-05-23T15:00:00Z"),
+                                                                                    "monitoring")
+    held = [getattr(facts, n) for n in type(facts).model_fields if n != "service_id"]
+    assert all(f.source not in ("ticket", "ai_suggestion") for f in held if f.known)
+
+    # T3 downtime uses the recorded restore time, not "still ongoing" (RTS-C Art. 3(2)).
+    t3 = next(x for x in result.classification.other_thresholds if x.threshold_id == "T3")
+    checks = {c.check_id: c for c in t3.checks}
+    downtime = checks["T3-b"]
+    assert (downtime.status, downtime.measurement.end_basis, downtime.measurement.ongoing) == (
+        "met", "service_restored_at", False)
+    assert downtime.reason.startswith("Service downtime: 2322.00 h")  # 15 Feb 21:00 to 23 May 15:00
+    assert all("ongoing" not in c.reason for c in t3.checks)
+
+    # Code repeated exactly the AI's own earlier calls for SVC-OLB, timeline first, and nothing for the others.
+    early = [r for r in result.trace if r["kind"] == "tool_call" and r["by"] == EARLY_BY]
+    assert [(r["tool"], r["arguments"]["service_id"]) for r in early] == [
+        ("get_outage_timeline", "SVC-OLB"), ("get_client_impact", "SVC-OLB")]
+    assert early[0]["arguments"]["around"] == C01_AT  # the same arguments the AI gave
+    assert all(r["ok"] and r["facts_recorded"] for r in early)
+    assert "get_outage_timeline (code, after the service choice)" in result.tool_path
+
+    # Only one get_service ran (the two-service answer was refused).
+    ok = [r for r in result.trace if r["kind"] == "tool_call" and r["tool"] == "get_service" and r["ok"]]
+    assert [r["arguments"]["service_id"] for r in ok] == ["SVC-OLB"]
+
+
+def test_get_service_reply_tells_the_ai_which_earlier_lookups_code_ran():
+    # Only the timelines were checked, so the run is not final after get_service and the reply reaches the AI.
+    fake = FakeProvider(c01_live_sequence()[:2] + [
+        lookups(("get_service", {"service_id": "SVC-OLB"})),
+        say("done"),
+    ])
+    AgentRun(C01_TICKET, t(C01_AT), fake).start()
+    assert len(fake.calls) == 4
+    reply = [m for m in fake.calls[3][0] if m.role == "tool"][-1]
+    [service_result] = data_content(reply.content)["results"]
+    [rerun] = service_result["earlier_lookups_rerun"]
+    assert rerun["tool"] == "get_outage_timeline" and "service_restored_at" in rerun["facts_recorded"]
+
+
+def test_c01_live_sequence_status_says_choose_exactly_one_service():
+    fake = FakeProvider(c01_live_sequence())
+    AgentRun(C01_TICKET, t(C01_AT), fake).start()
+    # After the candidate checks (steps 2, 3 and the refused step 4), every status says to choose ONE service,
+    # also the short "unchanged" ones.
+    for step in (2, 3, 4):
+        status = data_content(fake.calls[step][0][-1].content)
+        assert status["incident_service"] == CHOOSE_ONE
+    assert "exactly ONE service" in CHOOSE_ONE and "do not run them" in CHOOSE_ONE
+    # Before any candidate check, the old text stays.
+    assert "get_service first" in data_content(fake.calls[1][0][-1].content)["incident_service"]
+
+
+def test_human_choosing_the_service_also_records_the_earlier_lookups():
+    fake = FakeProvider([
+        lookups(("find_service", {"text": "online or mobile banking"})),
+        lookups(("get_outage_timeline", {"service_id": "SVC-MOB", "around": C01_AT}),
+                ("get_client_impact", {"service_id": "SVC-MOB"}),
+                ("get_outage_timeline", {"service_id": "SVC-OLB", "around": C01_AT}),
+                ("get_client_impact", {"service_id": "SVC-OLB"})),
+        call("ask_human", facts=[SERVICE_QUESTION]),
+        say("never reached"),
+    ])
+    run = AgentRun(C01_TICKET, t(C01_AT), fake)
+    assert run.start().status == "needs_human"
+    done = run.resume(confirmed_by="Sam", answers={SERVICE_QUESTION: "SVC-OLB"})
+    # No extra AI step: code repeats the AI's SVC-OLB lookups after the human's choice, and the engine decides.
+    assert (done.status, done.classification.result) == ("finished", "major")
+    assert len(fake.calls) == 3
+    assert done.classification.facts.affected_clients.source == "client_data"
+
+
+def test_suggestion_of_a_system_value_says_suggested_by_the_ai_and_is_never_labelled_ticket():
+    # The AI copies a value from a record of a service not chosen yet, plus one fact really from the ticket.
+    fake = FakeProvider([
+        lookups(("find_service", {"text": C01_TICKET})),
+        lookups(*[("get_client_impact", {"service_id": s}) for s in C01_CANDIDATES]),
+        call("suggest_facts", suggestions=[
+            {"fact": "affected_clients", "value": 520000, "reason": "client impact record"},
+            {"fact": "repeated_complaints", "value": True, "reason": "Call centre queues are over an hour"}]),
+        say("done"),
+    ])
+    run = AgentRun(C01_TICKET, t(C01_AT), fake)
+    paused = run.start()
+    items = {i.fact_name: i for i in paused.review_items}
+    assert items["affected_clients"].seen_in_system == "client data (IMP-0001, SVC-OLB)"
+    assert items["repeated_complaints"].seen_in_system is None
+    # The page wording, made by plain code.
+    assert views.review_label(items["affected_clients"]).startswith("Suggested by the AI: affected_clients = 520,000.")
+    assert "not read from the ticket" in views.review_label(items["affected_clients"])
+    assert views.review_label(items["repeated_complaints"]).startswith("The AI read from the ticket:")
+
+    done = run.resume(confirmed_by="Sam", review=[ReviewDecision(fact_name=n, action="confirm") for n in items])
+    facts = done.classification.facts
+    assert (facts.affected_clients.source, facts.affected_clients.confirmed_by) == ("human", "Sam")
+    assert "client data (IMP-0001, SVC-OLB)" in facts.affected_clients.note
+    assert facts.repeated_complaints.source == "ticket"  # really read from the ticket

@@ -79,7 +79,7 @@ def test_boxes_that_show_run_output_are_read_only():
     by_label = {b.label: b for b in components(demo, gr.Textbox)}
     for label in ("Status", "Result from the rules engine", "Reasons, with articles",
                   "Trace, one line per logged step", "Draft initial notification",
-                  "Approved initial notification: NOT SENT", "Suggestion read from the ticket by the AI"):
+                  "Approved initial notification: NOT SENT", "Suggestion by the AI"):
         assert by_label[label].interactive is False, label
     (raw,) = components(demo, gr.Code)
     assert raw.interactive is False

@@ -203,9 +203,17 @@ def question_label(question: PendingQuestion) -> str:
 
 
 def review_label(item: ReviewItem) -> str:
-    """One AI suggestion from the ticket, for a person to accept or reject. Never used until confirmed."""
+    """One AI suggestion, for a person to accept or reject. Never used until confirmed.
+
+    If the same value came from a bank system in this run (plain code checks, fact_store.ReviewItem), the label
+    says "suggested by the AI" and names the system, never "read from the ticket" (Sam, 15 November 2026).
+    """
     value = one_line(item.suggested_value, 120)
     reason = one_line(item.reason, CELL_CHARS)
+    if item.seen_in_system:
+        where = one_line(item.seen_in_system, 200)
+        return (f"Suggested by the AI: {item.fact_name} = {value}. This value is the same as in {where}, "
+                f"not read from the ticket. Its reason: {reason}")
     return f"The AI read from the ticket: {item.fact_name} = {value}. Its reason: {reason}"
 
 

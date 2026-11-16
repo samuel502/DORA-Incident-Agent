@@ -244,7 +244,7 @@ def test_ticket_review_on_the_page(tmp_path):
 
     questions = {q.fact_name: ("no", False) for q in shown.questions}
     half = c.send_answers(session, "Sam Tester", questions, {"media_coverage": ("confirm", "", False)})
-    assert half.status == "Not done: Decide every suggestion from the ticket: costs_eur has no decision."
+    assert half.status == "Not done: Decide every AI suggestion: costs_eur has no decision."
     assert session.result.status == "needs_human"  # all or nothing: nothing was written
 
     bad = c.send_answers(session, "Sam Tester", questions,

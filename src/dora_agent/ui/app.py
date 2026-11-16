@@ -47,7 +47,7 @@ TEXTS = {
     "human": (
         "## Your answers\n\n"
         "The agent needs a person. Answer what you can: an empty answer stays unknown and is never guessed. "
-        "Decide every suggestion the AI read from the ticket: confirm it, correct it, or reject it. "
+        "Decide every suggestion the AI made: confirm it, correct it, or reject it. "
         "Nothing the AI suggests is used until you confirm it."
     ),
     "result": "## Result",
@@ -108,7 +108,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             review_boxes = {}
             for fact_name in c.REVIEW_NAMES:
                 with _hidden_group() as group:
-                    text = gr.Textbox(label="Suggestion read from the ticket by the AI", interactive=False)
+                    text = gr.Textbox(label="Suggestion by the AI", interactive=False)
                     choice = gr.Radio(choices=["confirm", "correct", "reject"], value=None, label="Your decision")
                     value = gr.Textbox(label="Corrected value (only if you chose correct)", max_length=200)
                     estimate = gr.Checkbox(label="This is an estimate", value=False)

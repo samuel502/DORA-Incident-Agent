@@ -274,7 +274,7 @@ def send_answers(session: Session, name: str, answers: dict[str, tuple[Any, bool
         for item in result.review_items:
             choice, value, estimate = review.get(item.fact_name, (None, "", False))
             if choice not in ("confirm", "correct", "reject"):
-                raise InputProblem(f"Decide every suggestion from the ticket: {item.fact_name} has no decision.")
+                raise InputProblem(f"Decide every AI suggestion: {item.fact_name} has no decision.")
             corrected = typed_value(item.fact_name, value) if choice == "correct" else None
             decisions.append(ReviewDecision(fact_name=item.fact_name, action=choice, value=corrected,
                                             is_estimate=bool(estimate) and choice != "reject"))

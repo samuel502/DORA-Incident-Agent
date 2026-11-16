@@ -37,6 +37,12 @@ limits (per answer and per run). The LLM chooses every lookup; code only runs th
 the outage timeline, then the rest in the LLM's order. While no incident service is chosen, get_service for
 two different services in one answer is refused: the LLM must pick one, or ask the human (service question).
 
+Earlier lookups (C01 live test, approved by Sam on 15 November 2026): lookups the LLM ran for a service before
+any service was chosen record nothing. When get_service sets the service (chosen by the LLM or by the human),
+code repeats those same read-only calls for that service in the same step, so their facts are recorded without
+an extra AI step. Calls the LLM asked for again in that answer are not repeated twice. Each repeat is logged
+(by "code, after the service choice") and counts against the run's tool call and time limits.
+
 A run can pause for the human: `start()` or `resume()` return status "needs_human" with the fixed
 questions and the list of ticket suggestions to review. The interface (block 6) or the test harness
 answers through `resume()`. The LLM never sees the human desk.
@@ -80,6 +86,8 @@ HumanOnly = Literal["not_yet", "ask", "done"]
 # What an older status is cut to in the conversation once a newer one arrives (shorter prompts).
 OLD_STATUS = "(older status, replaced by a newer one below)"
 STATUS_INTRO = "Status after this step, from the rules engine (plain code):\n"
+# Who ran a lookup that code repeats once the service is chosen (shown in the trace and the decision log).
+EARLY_BY = "code, after the service choice"
 TWO_SERVICES = ("not run: get_service for more than one service in one answer. Pick the one service whose records "
                 f'show this incident, or ask_human with ["{SERVICE_QUESTION}"] if the records do not tell them apart.')
 
@@ -226,6 +234,12 @@ class AgentRun:
             # and its service list facts are recorded (source: service list). The LLM does not choose it.
             self._run_tool(ToolCall(call_id="service-answer", name="get_service",
                                     arguments={"service_id": service}, raw_arguments=""), by="human answer")
+            # As when the AI chooses: the AI's earlier lookups for this service now record their facts.
+            _, time_hit, limit_hit = self._run_early_lookups([])
+            if time_hit:
+                return self._end("stopped", "time_limit")
+            if limit_hit:
+                return self._end("stopped", "tool_call_limit")
 
         current = self._rules_check()
         if current.result in FINAL:
@@ -331,6 +345,10 @@ class AgentRun:
 
         results: dict[tuple[int, int], dict] = {}
         time_hit = limit_hit = False
+        # Where the get_service call that set the incident service sits, if one in this answer did.
+        no_service_yet = self._context.incident_service is None
+        chose: tuple[int, int] | None = None
+        ran_now: list[ToolCall] = []  # calls of this answer that ran
         order = sorted(range(len(flat)), key=lambda n: RUN_FIRST.get(flat[n][2].name, len(RUN_FIRST)))
         for n in order:
             index, position, call = flat[n]
@@ -349,6 +367,16 @@ class AgentRun:
                                 before_service=False)
             else:
                 results[index, position] = self._run_tool(call, by="llm")
+                ran_now.append(call)
+                if (no_service_yet and chose is None and call.name == "get_service"
+                        and self._context.incident_service is not None):
+                    chose = (index, position)
+        if chose is not None and not (time_hit or limit_hit):
+            # This answer chose the service: code repeats the AI's earlier lookups for it (not the ones the AI
+            # asked for again in this answer, which have just run), so their facts are recorded in this step.
+            ran, time_hit, limit_hit = self._run_early_lookups(ran_now)
+            if ran:
+                results[chose] = {**results[chose], "earlier_lookups_rerun": ran}
         for index, call in enumerate(calls):
             unpacked = expanded.get(index)
             if isinstance(unpacked, ToolOutcome):  # a malformed lookups call: refused, nothing run
@@ -364,6 +392,26 @@ class AgentRun:
             self._messages.append(Message(role="tool", tool_call_id=call.call_id,
                                           content=tool_message(content, self._code)))
         return time_hit, limit_hit
+
+    def _run_early_lookups(self, asked_again: list[ToolCall]) -> tuple[list[dict], bool, bool]:
+        """Repeat the AI's lookups for the chosen service that ran before it was chosen (C01 live test,
+        approved by Sam on 15 November 2026). Same read-only calls, same arguments, checked and logged like any
+        call (by "code, after the service choice"), and counted against the run's tool call and time limits.
+        Returns a short summary per lookup for the LLM, and (time limit hit, tool call limit hit)."""
+        ran: list[dict] = []
+        service = self._context.incident_service
+        for call in self._toolbox.early_lookups_for(service, asked_again):
+            if self._time_left() <= 0:
+                return ran, True, False
+            if self._tool_calls >= self._limits.max_tool_calls:
+                return ran, False, True
+            content = self._run_tool(call, by=EARLY_BY)
+            summary = {"tool": call.name, "facts_recorded": content.get("facts_recorded", [])}
+            for key in ("note", "error"):
+                if content.get(key):
+                    summary[key] = content[key]
+            ran.append(summary)
+        return ran, False, False
 
     def _add_status(self, current: Classification) -> None:
         """Give the LLM the engine's status for its next choice. An older status is cut to one line."""
