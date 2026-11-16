@@ -1,5 +1,7 @@
 # DORA Incident Agent
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/samuel502/DORA-Incident-Agent/blob/main/notebooks/colab.ipynb)
+
 A prototype that checks whether an IT incident at a made-up bank, Rheinbank, is "major" under the EU's Digital Operational Resilience Act (DORA). An AI agent collects the missing facts from simulated bank systems, fixed rules taken from the law make the decision, and a person approves the draft initial notification.
 
 **Work in progress.** Not every part is built yet, and no results are claimed here. The full README, with measured results and limits, comes when the build is finished.

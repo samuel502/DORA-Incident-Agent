@@ -64,7 +64,7 @@ from dora_agent.agent.fact_store import Conflict, FactStore, ReviewDecision, Rev
 from dora_agent.agent.prompts import (REPAIR_MESSAGE, new_marker_code, system_prompt, task_message,
                                       tool_message)
 from dora_agent.agent.questions import (AnswerProblem, QUESTIONS, SERVICE_QUESTION, SERVICE_QUESTION_BASIS,
-                                        SERVICE_QUESTION_TEXT, interpret_answer)
+                                        SERVICE_QUESTION_PAGE_TEXT, interpret_answer)
 from dora_agent.agent.tools import RUN_FIRST, WHERE_TO_FIND, RunContext, Toolbox, ToolOutcome, check_first
 from dora_agent.agent.tools import status as rules_status
 from dora_agent.audit import DecisionLog
@@ -573,9 +573,10 @@ class AgentRun:
 
     def _pending(self, name: str) -> PendingQuestion:
         if name == SERVICE_QUESTION:
-            # Fixed wording; the choices are only the services find_service returned (names from the service list).
+            # Fixed wording that says why it is asked; the choices are only the services find_service returned
+            # (IDs and names from the service list, never ticket text).
             names = ", ".join(f"{sid} = {label}" for sid, label in self._context.candidates.items())
-            return PendingQuestion(fact_name=name, text=f"{SERVICE_QUESTION_TEXT} ({names})",
+            return PendingQuestion(fact_name=name, text=SERVICE_QUESTION_PAGE_TEXT.format(services=names),
                                    basis=SERVICE_QUESTION_BASIS, choices=tuple(self._context.candidates),
                                    allows_estimate=False)
         return _pending(name)

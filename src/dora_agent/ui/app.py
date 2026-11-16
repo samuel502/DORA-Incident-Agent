@@ -8,6 +8,8 @@ Safety rules (block 6 plan, section 6; security framework, "Unsafe output"):
   not used. Labels are fixed texts from this file or from the fixed questions in agent/questions.py.
   The one exception: the service question's label also lists the matching services' IDs and names, which
   come from the (synthetic) service list, never from the ticket or the AI. Its choices are those IDs.
+- A component's `info` text (shown under its label) may render Markdown, so it holds only the fixed
+  "unsure" notes from agent/questions.py, set once when the page is built. No button ever changes it.
 - Every button is hidden from Gradio's API page and its client libraries (api_visibility="private"),
   the REST routes that skip the queue are closed (api_open=False), and one request runs at a time.
 - Tests check all of this (tests/ui/test_app.py).
@@ -66,6 +68,12 @@ def _hidden_group():
     return gr.Group(visible=False)
 
 
+def _notice_box():
+    """The message box next to a button: shows what is missing when the button's action was refused.
+    A read-only plain-text box, hidden until there is a refusal (Sam, 16 November 2026)."""
+    return gr.Textbox(label="Not done: what is missing", interactive=False, visible=False, lines=2)
+
+
 def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.Blocks:
     """The page. provider_factory gives the AI for each run (tests pass a stand-in)."""
     max_ticket = agent_limits().max_ticket_chars
@@ -82,6 +90,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
         reported = gr.Textbox(label="Reported at (UTC), for example 2026-11-08T09:30Z", max_length=40)
         gr.Markdown(TEXTS["time"])
         run_button = gr.Button("Run", variant="primary")
+        run_notice = _notice_box()
         status = gr.Textbox(label="Status", interactive=False, lines=2)
         headline = gr.Textbox(label="Result from the rules engine", interactive=False)
 
@@ -99,7 +108,9 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                 label = f"{question.text} (Basis: {question.basis})"
                 with _hidden_group() as group:
                     if question.meaning:
-                        answer = gr.Radio(choices=["yes", "no", "unsure"], value=None, label=label)
+                        # info: the fixed note when "unsure" counts as a value (questions.py), shown under it.
+                        answer = gr.Radio(choices=["yes", "no", "unsure"], value=None, label=label,
+                                          info=question.unsure_note)
                     else:
                         answer = gr.Textbox(label=label, max_length=40)
                     estimate = gr.Checkbox(label="This is an estimate", value=False,
@@ -114,6 +125,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                     estimate = gr.Checkbox(label="This is an estimate", value=False)
                 review_boxes[fact_name] = (group, text, choice, value, estimate)
             send_button = gr.Button("Send answers", variant="primary")
+            send_notice = _notice_box()
 
         # ---------- 3. result and 4. trace ----------
         gr.Markdown(TEXTS["result"])
@@ -132,6 +144,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             causes = gr.Textbox(label="Possible causes, if known (goes into the description, field 2.4)",
                                 max_length=notes.max_causes_chars)
             draft_button = gr.Button("Prepare draft")
+            draft_notice = _notice_box()
             draft = gr.Textbox(label="Draft initial notification", interactive=False, lines=20)
             with _hidden_group() as approve_panel:
                 discovery = gr.Dropdown(choices=list(DISCOVERY_CHOICES), value=None,
@@ -145,6 +158,8 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                                          max_length=notes.max_description_chars, lines=4)
                 approver = gr.Textbox(label="Your name (recorded as the approver)", max_length=80)
                 approve_button = gr.Button("Approve (nothing is sent)", variant="primary")
+            # Outside the approval form, so a refusal after approval (form hidden) still shows.
+            approve_notice = _notice_box()
             approved = gr.Textbox(label="Approved initial notification: NOT SENT", interactive=False, lines=20,
                                   buttons=["copy"])
             download_text = gr.DownloadButton("Download as text", visible=False)
@@ -157,6 +172,8 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             outputs += [group, text, choice, value, estimate]
         outputs += [result, facts, trace, trace_json, draft_panel, draft, approve_panel, approved,
                     download_text, download_json]
+        notices = dict(zip(c.BUTTONS, (run_notice, send_notice, draft_notice, approve_notice)))
+        outputs += list(notices.values())
 
         def render(session: c.Session, shown: c.Screen) -> list:
             reset = shown.reset_inputs
@@ -186,6 +203,9 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                        gr.update(visible=shown.can_approve), shown.approved,
                        gr.update(value=files[0], visible=True) if files else gr.update(value=None, visible=False),
                        gr.update(value=files[1], visible=True) if files else gr.update(value=None, visible=False)]
+            for button in notices:
+                here = shown.notice_at == button
+                values.append(gr.update(value=shown.notice if here else "", visible=here))
             return values
 
         def session_of(value) -> c.Session:

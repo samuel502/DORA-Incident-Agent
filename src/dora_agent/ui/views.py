@@ -24,7 +24,8 @@ from typing import Any
 
 from dora_agent.agent.fact_store import Conflict, ReviewItem
 from dora_agent.agent.loop import PendingQuestion, RunResult
-from dora_agent.notification.approval import ApprovedNotification, render_text
+from dora_agent.agent.questions import QUESTIONS, SERVICE_QUESTION
+from dora_agent.notification.approval import MANAGEMENT_REMINDER, ApprovedNotification, render_text
 from dora_agent.notification.draft import Draft
 from dora_agent.rules.engine import Classification
 from dora_agent.rules.facts import HUMAN_CONFIRMED, Fact, IncidentFacts
@@ -46,11 +47,22 @@ RESULT_WORDS = {
     "undetermined": "UNDETERMINED",
     "not_an_incident": "NOT AN INCIDENT",
 }
+# Status wording (Sam, 16 November 2026). A waiting run also says which kind of question is pending
+# (pending_kinds), and a stopped run says why (STOP_WORDS).
 STATUS_WORDS = {
     "finished": "Finished",
-    "needs_human": "Waiting for you: please answer the questions and review the suggestions",
+    "needs_human": "Waiting for a person",
     "stopped": "Stopped early",
 }
+STOP_WORDS = {
+    "step_limit": "the limit on AI steps was reached",
+    "tool_call_limit": "the limit on tool calls was reached",
+    "human_round_limit": "the limit on rounds of questions was reached",
+    "llm_error": "the AI could not be reached",
+    "repeat_limit": "the AI kept repeating the same lookups",
+    "time_limit": "the time limit for this run was reached",
+}
+
 SOURCE_WORDS = {
     "ticket": "ticket",
     "service_list": "service list",
@@ -126,13 +138,58 @@ def _value(name: str, fact: Fact) -> str:
 def headline(result: RunResult) -> str:
     """One line: the rules engine's result and where the run is."""
     word = RESULT_WORDS[result.classification.result]
-    return f"Result from the rules engine: {word}. Status: {STATUS_WORDS[result.status]}."
+    return f"Result from the rules engine: {word}. Status: {status_words(result)}."
+
+
+def status_words(result: RunResult) -> str:
+    """Where the run is, in words: finished, waiting for a person (and for what), or stopped early (and why)."""
+    words = STATUS_WORDS[result.status]
+    if result.status == "needs_human":
+        kinds = pending_kinds(result)
+        return f"{words} ({kinds})" if kinds else words
+    if result.status == "stopped" and result.stop_reason in STOP_WORDS:
+        return f"{words}: {STOP_WORDS[result.stop_reason]}"
+    return words
+
+
+def pending_kinds(result: RunResult) -> str:
+    """Which kinds of question wait for a person, for example "which service is affected; 2 yes/no questions"."""
+    def count(n: int, one: str, many: str) -> str:
+        return f"{n} {one if n == 1 else many}"
+
+    questions = result.questions if result.status == "needs_human" else ()
+    service = any(q.fact_name == SERVICE_QUESTION for q in questions)
+    yes_no = sum(1 for q in questions if q.fact_name != SERVICE_QUESTION and q.choices)
+    typed = sum(1 for q in questions if not q.choices)
+    review = len(result.review_items) if result.status == "needs_human" else 0
+    parts = []
+    if service:
+        parts.append("which service is affected")
+    if yes_no:
+        parts.append(count(yes_no, "yes/no question", "yes/no questions"))
+    if typed:
+        parts.append(count(typed, "number or time question", "number or time questions"))
+    if review:
+        parts.append(count(review, "AI suggestion to confirm, correct or reject",
+                           "AI suggestions to confirm, correct or reject"))
+    return "; ".join(parts)
+
+
+def status_text(result: RunResult) -> str:
+    """The status box. A waiting run lists what is pending; otherwise the run's own message."""
+    if result.status == "needs_human":
+        kinds = pending_kinds(result)
+        return (f"Waiting for a person. Pending: {kinds}. Answer below, type your name and press Send answers."
+                if kinds else "Waiting for a person. Answer below, type your name and press Send answers.")
+    return result.message
 
 
 def result_text(result: RunResult) -> str:
     """The result panel: summary, reasons with articles, what is missing, conflicts and run limits."""
     c = result.classification
     lines = [headline(result), "", c.summary, "", result.message, ""]
+    if c.result == "major":
+        lines += [MANAGEMENT_REMINDER, ""]
     lines += reasons_lines(c)
     lines += ["", *missing_lines(c)]
     if result.conflicts:
@@ -199,7 +256,13 @@ def conflict_lines(conflicts: tuple[Conflict, ...]) -> list[str]:
 def question_label(question: PendingQuestion) -> str:
     """The fixed question with its legal basis, for the label next to the answer box."""
     hint = " An estimate is allowed: tick the box if it is one." if question.allows_estimate else ""
-    return one_line(f"{question.text} (Basis: {question.basis}){hint}", 600)
+    return one_line(f"{question.text} (Basis: {question.basis}){hint}{unsure_hint(question.fact_name)}", 1000)
+
+
+def unsure_hint(fact_name: str) -> str:
+    """The fixed note for a question where "unsure" is turned into a value, with a leading space, or ""."""
+    question = QUESTIONS.get(fact_name)
+    return f" {question.unsure_note}" if question and question.unsure_note else ""
 
 
 def review_label(item: ReviewItem) -> str:

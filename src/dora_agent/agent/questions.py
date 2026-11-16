@@ -29,6 +29,9 @@ class Question(BaseModel):
     # For yes/no questions: what each answer means for the fact. None = stays unknown.
     meaning: dict[str, bool | None] | None = None
     allows_estimate: bool = False
+    # Shown next to the question when "unsure" is turned into a value instead of staying unknown
+    # (Sam, 16 November 2026). A test checks every such question has one.
+    unsure_note: str | None = None
 
 
 def _yes_no(fact_name, text, basis) -> Question:
@@ -63,7 +66,9 @@ QUESTIONS: dict[str, Question] = {
         Question(fact_name="access_may_cause_data_loss",
                  text="Can you rule out that data could have been affected by this access?",
                  basis="Section 3, T5-b, RTS-C Art. 9(5)(b): 'may result in data losses'",
-                 meaning={"yes": False, "no": True, "unsure": True}),
+                 meaning={"yes": False, "no": True, "unsure": True},
+                 unsure_note=("If you answer \"unsure\", it counts as \"no\": data loss can't be ruled out, so "
+                              "the access counts as one that may result in data losses (RTS-C Art. 9(5)(b)).")),
         # T1-f
         _yes_no("relevant_parties_affected",
                 "Were any clients or financial counterparts affected that Rheinbank has marked as relevant?",
@@ -126,6 +131,14 @@ QUESTIONS: dict[str, Question] = {
 SERVICE_QUESTION = "incident_service"
 SERVICE_QUESTION_TEXT = ("Several services match this ticket and their records do not tell them apart. "
                          "Which service is the affected service to classify?")
+# What the page shows, so the person knows why they are asked (Sam, 16 November 2026). {services} is filled
+# by code with "ID = name" of the services find_service returned: IDs and names from the (synthetic) service
+# list, never text from the ticket or the AI.
+SERVICE_QUESTION_PAGE_TEXT = (
+    "The ticket matches more than one service in Rheinbank's service list: {services}. Their records do not "
+    "show which one this incident is about. The rules need exactly one affected service, because whether it "
+    "supports a critical or important function (gate), how many clients use it (T1) and how long it was down "
+    "(T3) all come from that service's records. Which service is the affected service to classify?")
 SERVICE_QUESTION_BASIS = "docs/dora-rules.md section 6: affected service (gate, T1, T3), from the ticket and service list"
 
 

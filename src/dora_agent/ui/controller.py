@@ -28,7 +28,7 @@ from pydantic import ValidationError
 
 from dora_agent.agent.fact_store import ReviewDecision, ReviewItem
 from dora_agent.agent.loop import AgentRun, PendingQuestion, RunProblem, RunResult
-from dora_agent.agent.questions import QUESTIONS
+from dora_agent.agent.questions import QUESTIONS, SERVICE_QUESTION
 from dora_agent.agent.values import FACT_KINDS
 from dora_agent.config import PROJECT_ROOT, agent_limits
 from dora_agent.llm.provider import LlmError, LlmProvider
@@ -94,6 +94,13 @@ class Screen:
     can_approve: bool = False
     approved: str = ""
     downloads: tuple[str, str] | None = None
+    # A refusal, shown in a box next to the button that was pressed (Sam, 16 November 2026).
+    notice: str = ""
+    notice_at: str = ""  # "run", "send", "draft" or "approve"; empty when nothing was refused
+
+
+# The buttons a refusal can be shown next to.
+BUTTONS = ("run", "send", "draft", "approve")
 
 
 # ---------- samples ----------
@@ -173,15 +180,16 @@ def typed_value(fact_name: str, text: str) -> Any:
 # ---------- the screen ----------
 
 
-def screen(session: Session, status: str = "", *, reset_inputs: bool = False) -> Screen:
+def screen(session: Session, status: str = "", *, reset_inputs: bool = False, notice: str = "",
+           notice_at: str = "") -> Screen:
     result = session.result
     if result is None:
-        return Screen(status=status)
+        return Screen(status=status, notice=notice, notice_at=notice_at)
     waiting = result.status == "needs_human"
     major_done = result.classification.result == "major" and result.status != "needs_human"
     approved = session.approved
     return Screen(
-        status=status or result.message,
+        status=status or views.status_text(result),
         headline=views.headline(result),
         result=views.result_text(result),
         facts=views.fact_rows(result.classification.facts),
@@ -196,24 +204,38 @@ def screen(session: Session, status: str = "", *, reset_inputs: bool = False) ->
         can_approve=session.draft is not None and approved is None,
         approved=views.notification_text(approved, sample=session.sample) if approved else "",
         downloads=session.downloads,
+        notice=notice,
+        notice_at=notice_at,
     )
 
 
-def _guarded(action: Callable[[], Screen], session: Session) -> Screen:
-    """Run one button's action. Known problems show their plain message; anything else a fixed one."""
+def _guarded(action: Callable[[], Screen], session: Session, button: str) -> Screen:
+    """Run one button's action. Known problems show their plain message; anything else a fixed one.
+
+    A refusal shows in the status box and in the message box next to the button that was pressed.
+    """
+    def refused(message: str) -> Screen:
+        return screen(session, message, notice=message, notice_at=button)
+
     try:
         return action()
     except (InputProblem, RunProblem, ApprovalProblem, DraftProblem, NotMajor) as problem:
-        return screen(session, f"Not done: {problem}")
+        return refused(f"Not done: {problem}")
     except LlmError as error:
-        return screen(session, f"Not done: the AI could not be used ({error}).")
+        return refused(f"Not done: the AI could not be used ({error}).")
     except ValidationError as error:
         first = error.errors()[0]
         where = ".".join(str(p) for p in first.get("loc", ())) or "input"
-        return screen(session, f"Not done: {where}: {first.get('msg', 'not valid')}.")
+        return refused(f"Not done: {where}: {first.get('msg', 'not valid')}.")
     except Exception:  # noqa: BLE001 - the page must never show raw error text
         log.exception("unexpected error on the page")
-        return screen(session, UNEXPECTED)
+        return refused(UNEXPECTED)
+
+
+def _still_missing(missing: list[str]) -> None:
+    """Refuse with one message that names everything still missing."""
+    if missing:
+        raise InputProblem("Still missing: " + "; ".join(missing) + ".")
 
 
 # ---------- the buttons ----------
@@ -243,7 +265,7 @@ def start(session: Session, ticket: str, reported_text: str, sample_id: str | No
         session.result = run.start()
         return screen(session, reset_inputs=True)
 
-    return _guarded(action, session)
+    return _guarded(action, session, "run")
 
 
 def send_answers(session: Session, name: str, answers: dict[str, tuple[Any, bool]],
@@ -259,8 +281,15 @@ def send_answers(session: Session, name: str, answers: dict[str, tuple[Any, bool
         result = session.result
         if session.run is None or result is None or result.status != "needs_human":
             raise InputProblem("There is nothing to answer right now.")
+        missing = []
         if not (name or "").strip():
-            raise InputProblem("Type your name first. It is recorded with your answers.")
+            missing.append("your name (it is recorded with your answers)")
+        if any(q.fact_name == SERVICE_QUESTION for q in result.questions):
+            raw, _ = answers.get(SERVICE_QUESTION, (None, False))
+            if raw is None or not str(raw).strip():
+                # Without the service the run can't go on usefully, so nothing is sent (Sam, 16 November 2026).
+                missing.append("which service is the affected service (pick one of the listed services)")
+        _still_missing(missing)
         given: dict[str, Any] = {}
         estimates: set[str] = set()
         for question in result.questions:
@@ -282,7 +311,7 @@ def send_answers(session: Session, name: str, answers: dict[str, tuple[Any, bool
                                             review=decisions)
         return screen(session, reset_inputs=True)
 
-    return _guarded(action, session)
+    return _guarded(action, session, "send")
 
 
 def make_draft(session: Session, causes: str) -> Screen:
@@ -290,8 +319,10 @@ def make_draft(session: Session, causes: str) -> Screen:
 
     def action() -> Screen:
         result = session.result
-        if session.run is None or result is None or result.status == "needs_human":
-            raise InputProblem("Finish the run first.")
+        if session.run is None or result is None:
+            raise InputProblem("There is no run yet. Paste a ticket or pick a sample, then press Run.")
+        if result.status == "needs_human":
+            raise InputProblem("Finish the run first: the questions above are still waiting for answers.")
         if session.approved is not None:
             raise InputProblem("This notification is already approved. Start a new run to draft again.")
         session.draft = prepare_draft(result.run_id, result.classification, session.run.log.records,
@@ -299,7 +330,7 @@ def make_draft(session: Session, causes: str) -> Screen:
                                       log=session.run.log)
         return screen(session, "Draft prepared. Fill in the fields below, then approve. Nothing is sent.")
 
-    return _guarded(action, session)
+    return _guarded(action, session, "draft")
 
 
 def approve_draft(session: Session, approver: str, discovery: str | None, plan_activated: str | None,
@@ -309,13 +340,18 @@ def approve_draft(session: Session, approver: str, discovery: str | None, plan_a
 
     def action() -> Screen:
         if session.draft is None or session.run is None:
-            raise InputProblem("Prepare the draft first.")
+            raise InputProblem("There is no draft yet. Press Prepare draft first.")
         if session.approved is not None:
-            raise InputProblem("This notification is already approved.")
-        if plan_activated not in YES_NO:
-            raise InputProblem("2.9: say whether the business continuity plan was activated (yes or no).")
+            raise InputProblem("This notification is already approved. It can only be approved once; "
+                               "start a new run for a new notification.")
+        missing = []
+        if not (approver or "").strip():
+            missing.append("your name as the approver")
         if not discovery:
-            raise InputProblem("2.7: pick how the incident was discovered.")
+            missing.append("2.7 how the incident was discovered")
+        if plan_activated not in YES_NO:
+            missing.append("2.9 whether the business continuity plan was activated (yes or no)")
+        _still_missing(missing)
         human = HumanFields(discovery=discovery, business_continuity_plan_activated=YES_NO[plan_activated],
                             third_party_origin=(third_party or "").strip() or None,
                             other_information=(other or "").strip() or None,
@@ -326,7 +362,7 @@ def approve_draft(session: Session, approver: str, discovery: str | None, plan_a
             session.downloads = _write_downloads(session.approved, out_dir, sample=session.sample)
         return screen(session, "Approved. NOT SENT: this tool never sends anything.")
 
-    return _guarded(action, session)
+    return _guarded(action, session, "approve")
 
 
 def _write_downloads(approved: ApprovedNotification, out_dir: Path, *, sample: bool) -> tuple[str, str]:

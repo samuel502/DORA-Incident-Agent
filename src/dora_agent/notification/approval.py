@@ -27,6 +27,9 @@ from dora_agent.notification.fields import DISCOVERY_CHOICES, NotificationField
 from dora_agent.rules.facts import Frozen, PersonName, UtcTime
 
 NOT_SENT = "Approved for submission by a human. NOT SENT: this tool never sends anything."
+# Reminder only, for a major result (Sam, 16 November 2026). DORA Art. 17(3)(e): the financial entity informs
+# its management body of at least major ICT-related incidents. Not a classification rule; it changes no field.
+MANAGEMENT_REMINDER = "Management body to be informed (DORA Art. 17(3)(e)). Reminder only: it does not change the result."
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _NAME = TypeAdapter(PersonName)
@@ -154,6 +157,8 @@ def render_text(notification: Draft | ApprovedNotification) -> str:
                   f"Approved by {notification.approved_by} at {notification.accepted_at:%Y-%m-%d %H:%M UTC}.", ""]
     else:
         lines += [notification.status, ""]
+    # A draft exists only for a major result. Reminder only (DORA Art. 17(3)(e)); it changes no field.
+    lines += [MANAGEMENT_REMINDER, ""]
     deadline = notification.deadline
     if deadline is None:
         lines += ["Deadline: unknown until the detection time (field 2.2) is known.", ""]

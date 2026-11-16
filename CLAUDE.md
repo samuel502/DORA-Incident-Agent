@@ -56,6 +56,7 @@ Full details are in `docs/project-brief.md`. Scope and definition of done are in
 ## Before you call a block done
 
 - All tests pass (`pytest`)
+- After every change, run the full test suite with `python -m pytest`. End every summary with the exact final pytest line, for example "1307 passed, 5 skipped". If anything fails, say so at the top of the summary
 - Security checks pass (see `docs/security-framework.md`)
 - Run `/security-review` on the changes
 - Explain to Sam what changed, file by file, with line numbers

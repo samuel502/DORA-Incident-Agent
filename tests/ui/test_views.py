@@ -173,8 +173,8 @@ def test_question_labels_show_the_legal_basis(paused):
         label = views.question_label(q)
         assert q.basis in label and "\n" not in label
         assert ("estimate is allowed" in label) == q.allows_estimate
-    assert views.headline(paused).endswith("Status: Waiting for you: please answer the questions and review "
-                                           "the suggestions.")
+    assert views.headline(paused).startswith("Result from the rules engine: UNDETERMINED. Status: Waiting for a "
+                                             "person (")
 
 
 def test_review_label_from_hostile_text_stays_one_literal_line():

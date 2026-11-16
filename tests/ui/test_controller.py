@@ -182,12 +182,13 @@ def test_hostile_ticket_comes_out_as_literal_text(tmp_path):
 
 def test_full_path_questions_review_draft_approval(tmp_path):
     session, shown = started("C02", tmp_path)
-    assert shown.questions and shown.headline.endswith("Status: Waiting for you: please answer the questions "
-                                                       "and review the suggestions.")
+    assert shown.questions and shown.headline.startswith("Result from the rules engine: UNDETERMINED. "
+                                                         "Status: Waiting for a person (")
+    assert "yes/no questions" in shown.headline and shown.status.startswith("Waiting for a person. Pending: ")
     assert not shown.can_draft
 
     nameless = answer_like_the_answer_key(session, "C02", name="  ")
-    assert nameless.status == "Not done: Type your name first. It is recorded with your answers."
+    assert nameless.status == "Not done: Still missing: your name (it is recorded with your answers)."
     assert session.result.status == "needs_human"  # nothing was sent to the agent
 
     shown = answer_like_the_answer_key(session, "C02")
@@ -201,9 +202,10 @@ def test_full_path_questions_review_draft_approval(tmp_path):
     assert "This sample replays an incident" in shown.draft  # unchanged sample: the late note
 
     refused = c.approve_draft(session, "Sam Approver", None, "no", "", "", "", out_dir=tmp_path)
-    assert refused.status.startswith("Not done: 2.7") and session.approved is None
+    assert refused.status == "Not done: Still missing: 2.7 how the incident was discovered."
+    assert session.approved is None
     nameless = c.approve_draft(session, " ", "IT security", "no", "", "", "", out_dir=tmp_path)
-    assert nameless.status.startswith("Not done: the approver's name") and session.approved is None
+    assert nameless.status == "Not done: Still missing: your name as the approver." and session.approved is None
 
     shown = c.approve_draft(session, "Sam Approver", "IT security", "no", "", "", "", out_dir=tmp_path)
     assert session.approved.approved_by == "Sam Approver"
@@ -214,7 +216,7 @@ def test_full_path_questions_review_draft_approval(tmp_path):
     assert not shown.can_draft and not shown.can_approve
 
     again = c.approve_draft(session, "Someone Else", "IT security", "no", "", "", "", out_dir=tmp_path)
-    assert again.status == "Not done: This notification is already approved."
+    assert again.status.startswith("Not done: This notification is already approved. It can only be approved once")
     assert session.approved.approved_by == "Sam Approver"
 
 
@@ -264,7 +266,8 @@ def test_draft_needs_a_finished_major_run(tmp_path):
     session, _ = started("N01", tmp_path)
     shown = c.make_draft(session, "")
     assert shown.status.startswith("Not done:") and session.draft is None
-    assert c.make_draft(c.Session(), "").status == "Not done: Finish the run first."
+    assert c.make_draft(c.Session(), "").status == ("Not done: There is no run yet. Paste a ticket or pick a "
+                                                    "sample, then press Run.")
 
 
 def test_nothing_to_answer_without_a_waiting_run():
