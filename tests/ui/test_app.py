@@ -90,7 +90,7 @@ def test_boxes_that_show_run_output_are_read_only():
 
 def test_every_event_is_private_and_the_rest_routes_are_closed():
     demo = built()
-    assert len(demo.fns) == 5
+    assert len(demo.fns) == 6  # sample pick, ticket edit (clears the briefing), and the four buttons
     assert {f.api_visibility for f in demo.fns.values()} == {"private"}
     assert demo.api_open is False
     assert demo._queue.default_concurrency_limit == 1
@@ -118,8 +118,10 @@ def test_run_on_the_page_with_a_hostile_ticket_gives_literal_text(tmp_path, monk
 
 def test_sample_picker_fills_ticket_and_time():
     demo = built()
-    (pick,) = [f for f in demo.fns.values() if len(f.outputs) == 2]
-    assert pick.fn("C01") == c.load_sample("C01")
+    (pick,) = [f for f in demo.fns.values() if len(f.outputs) == 3]
+    ticket, reported, briefing = pick.fn("C01")
+    assert (ticket, reported) == c.load_sample("C01")
+    assert briefing == {"__type__": "update", "value": c.briefing_for("C01"), "visible": True}
 
 
 def test_every_button_returns_one_value_per_box(tmp_path, monkeypatch):

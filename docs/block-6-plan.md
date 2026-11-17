@@ -10,6 +10,7 @@ A page where you paste a ticket or pick a sample case. You watch the agent work,
 
 - A text box for the ticket (2000-character cap) and the time it was reported (UTC, default "now").
 - A sample picker that reads only `cases/samples.json` (no answers, no real names). Never `cases/scenarios/index.json`.
+- A scenario briefing for a picked sample (added 16 November 2026, approved by Sam). It comes from `cases/briefings.json`, which is generated from the answer key (`python -m dora_agent.evaluation.briefings`) and holds only the person's answers and the affected service's plain name, never expected results, reasons or real case names. It is for the person only and never reaches the AI, the tools or the decision log.
 - "Run" starts the agent. One run at a time per browser session.
 
 ## 2. Questions and ticket review

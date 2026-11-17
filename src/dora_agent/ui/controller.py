@@ -41,6 +41,10 @@ from dora_agent.ui import views
 log = logging.getLogger(__name__)
 
 SAMPLES_PATH = PROJECT_ROOT / "cases" / "samples.json"
+# Scenario briefings for the samples (Sam, 16 November 2026): generated from the answer key by a developer
+# script (named in the file's "about"), so the page never reads the answer key itself. For the person only:
+# never given to the AI, the tools or the decision log.
+BRIEFINGS_PATH = PROJECT_ROOT / "cases" / "briefings.json"
 # Decision logs and approved notifications of runs made on the page (git-ignored, like all of logs/).
 RUN_LOG_DIR = PROJECT_ROOT / "logs" / "runs"
 # Where the approved notification's text and JSON files are saved (Sam, 16 November 2026). Download buttons on
@@ -78,6 +82,7 @@ class Session:
     result: RunResult | None = None
     provider: LlmProvider | None = None
     sample: bool = False  # True: an unchanged sample ticket, replayed (for the late-classification note)
+    briefing: str = ""  # the picked sample's briefing, for the person only; empty for a pasted or edited ticket
     draft: Draft | None = None
     approved: ApprovedNotification | None = None
     downloads: tuple[str, str] | None = None  # text and JSON file of the approved notification
@@ -102,6 +107,7 @@ class Screen:
     can_approve: bool = False
     approved: str = ""
     downloads: tuple[str, str] | None = None
+    briefing: str = ""  # shown in its own read-only box; never part of anything sent to the AI
     # A refusal, shown in a box next to the button that was pressed (Sam, 16 November 2026).
     notice: str = ""
     notice_at: str = ""  # "run", "send", "draft" or "approve"; empty when nothing was refused
@@ -125,6 +131,26 @@ def samples() -> tuple[Sample, ...]:
 def sample_choices() -> list[tuple[str, str]]:
     """(label, sample_id) pairs for the picker."""
     return [(f"{s.sample_id}: {s.title}", s.sample_id) for s in samples()]
+
+
+@lru_cache(maxsize=1)
+def briefings() -> dict[str, str]:
+    """Every sample's briefing as plain text, by sample ID. Read only from cases/briefings.json."""
+    data = json.loads(BRIEFINGS_PATH.read_text(encoding="utf-8"))
+    if "SYNTHETIC DATA" not in data.get("about", ""):
+        raise ValueError("cases/briefings.json must be marked as synthetic data")
+    return {sample_id: "\n".join(lines) for sample_id, lines in data["briefings"].items()}
+
+
+def briefing_for(sample_id: str | None) -> str:
+    """The briefing of one sample, or "" (no sample, or a sample without one)."""
+    return briefings().get(sample_id, "") if sample_id else ""
+
+
+def pick_sample(sample_id: str | None) -> tuple[str, str, str]:
+    """Picking a sample: its ticket, its reported time and its briefing (for the person only)."""
+    ticket, reported = load_sample(sample_id)
+    return ticket, reported, briefing_for(sample_id) if ticket else ""
 
 
 def load_sample(sample_id: str | None) -> tuple[str, str]:
@@ -212,6 +238,7 @@ def screen(session: Session, status: str = "", *, reset_inputs: bool = False, no
         can_approve=session.draft is not None and approved is None,
         approved=views.notification_text(approved, sample=session.sample) if approved else "",
         downloads=session.downloads,
+        briefing=session.briefing,
         notice=notice,
         notice_at=notice_at,
     )
@@ -269,6 +296,8 @@ def start(session: Session, ticket: str, reported_text: str, sample_id: str | No
         run = AgentRun(text, reported_at, provider, as_of=moment, log_dir=log_dir)
         session.run, session.provider, session.result = run, provider, None
         session.sample = _is_unchanged_sample(sample_id, text, reported_at)
+        # Only an unchanged sample keeps its briefing. It stays on the page: AgentRun never gets it.
+        session.briefing = briefing_for(sample_id) if session.sample else ""
         session.draft = session.approved = session.downloads = None
         session.result = run.start()
         return screen(session, reset_inputs=True)

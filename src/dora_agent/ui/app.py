@@ -88,6 +88,10 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
         ticket = gr.Textbox(label=f"Incident ticket (at most {max_ticket} characters)", lines=6,
                             max_length=max_ticket)
         reported = gr.Textbox(label="Reported at (UTC), for example 2026-11-08T09:30Z", max_length=40)
+        # Tabletop briefing for a picked sample (cases/briefings.json). For the person only: read-only plain text,
+        # never an input of any button, so it can't reach the AI, the tools or the decision log.
+        briefing = gr.Textbox(label="Scenario briefing (for you only, never given to the AI)", interactive=False,
+                              lines=6, visible=False)
         gr.Markdown(TEXTS["time"])
         run_button = gr.Button("Run", variant="primary")
         run_notice = _notice_box()
@@ -174,6 +178,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
         outputs += [result, facts, trace, trace_json, draft_panel, draft, approve_panel, approved]
         notices = dict(zip(c.BUTTONS, (run_notice, send_notice, draft_notice, approve_notice)))
         outputs += list(notices.values())
+        outputs.append(briefing)
 
         def render(session: c.Session, shown: c.Screen) -> list:
             reset = shown.reset_inputs
@@ -203,6 +208,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             for button in notices:
                 here = shown.notice_at == button
                 values.append(gr.update(value=shown.notice if here else "", visible=here))
+            values.append(gr.update(value=shown.briefing, visible=bool(shown.briefing)))
             return values
 
         def session_of(value) -> c.Session:
@@ -234,7 +240,15 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                                                    third_text, other_text, own_text))
 
         private = {"api_visibility": "private"}
-        sample.change(c.load_sample, [sample], [ticket, reported], **private)
+        def on_pick(sample_id):
+            ticket_text, reported_text, text = c.pick_sample(sample_id)
+            return ticket_text, reported_text, gr.update(value=text, visible=bool(text))
+
+        def on_edit():  # the person typed or pasted in the ticket box: no briefing for that ticket
+            return gr.update(value="", visible=False)
+
+        sample.change(on_pick, [sample], [ticket, reported, briefing], **private)
+        ticket.input(on_edit, None, [briefing], **private)
         run_button.click(on_run, [state, ticket, reported, sample], outputs, **private)
         send_button.click(on_send, [state, name, service_answer, *answer_inputs, *review_inputs], outputs,
                           **private)
