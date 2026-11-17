@@ -1,0 +1,70 @@
+# CI for the Rheinbank DORA agent (block 7, docs/block-7-plan.md).
+# Step a: run the full offline pytest suite on every push and pull request.
+#
+# Hard rules (docs/block-7-plan.md, "Hard rules for CI"):
+# - Every action is pinned to a full commit SHA. The version is in the comment next to it.
+# - The workflow token can only read the repo (permissions: contents: read).
+# - No secrets and no Groq key. Live Groq tests must stay skipped, and a step below checks that.
+# - Every job has a time limit.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Read-only token for every job. Nothing in this workflow writes to the repo.
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: pytest (Python 3.13, Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Live Groq tests run only with RUN_LIVE_TESTS=1 and a key (tests/live/test_live_groq.py:32).
+      # Set both to "off" here on purpose, so a key can never be picked up by accident.
+      RUN_LIVE_TESTS: "0"
+      GROQ_API_KEY: ""
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Get the code
+        # actions/checkout v7.0.1, commit looked up from the release tag on 17 November 2026
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          # Do not leave the job token on disk after checkout.
+          persist-credentials: false
+
+      - name: Install Python 3.13 (the version Colab runs)
+        # actions/setup-python v7.1.0, commit looked up from the release tag on 17 November 2026
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+
+      - name: Install the pinned requirements (same command as the Colab setup cell)
+        run: "python -m pip install --only-binary=:all: -r requirements.txt"
+
+      - name: Run the full test suite
+        run: python -m pytest --junitxml=pytest-report.xml
+
+      - name: Check that the live Groq tests were skipped
+        # Fails the run if no live test was found, or if any live test did anything but skip.
+        shell: python
+        run: |
+          import sys
+          import xml.etree.ElementTree as ET
+
+          cases = ET.parse("pytest-report.xml").getroot().iter("testcase")
+          live = [c for c in cases if c.get("classname", "").startswith("tests.live.")]
+          not_skipped = [c.get("name") for c in live if c.find("skipped") is None]
+          if not live:
+              sys.exit("No live tests found in the report. Expected them to be collected and skipped.")
+          if not_skipped:
+              sys.exit(f"Live Groq tests ran in CI, which is not allowed: {not_skipped}")
+          print(f"OK: all {len(live)} live Groq tests were skipped.")
