@@ -1,5 +1,6 @@
 # CI for the Rheinbank DORA agent (block 7, docs/block-7-plan.md).
 # Step a: run the full offline pytest suite on every push and pull request.
+# Step b: security scans (Bandit, Semgrep, pip-audit, gitleaks) in a second job.
 #
 # Hard rules (docs/block-7-plan.md, "Hard rules for CI"):
 # - Every action is pinned to a full commit SHA. The version is in the comment next to it.
@@ -68,3 +69,91 @@ jobs:
           if not_skipped:
               sys.exit(f"Live Groq tests ran in CI, which is not allowed: {not_skipped}")
           print(f"OK: all {len(live)} live Groq tests were skipped.")
+
+  # Step b: security scans (docs/security-framework.md section 3). Runs side by side with the tests.
+  # Each scan step runs even if an earlier scan failed, so one run always shows all four results.
+  scans:
+    name: security scans (Bandit, Semgrep, pip-audit, gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      # Belt and braces next to --metrics=off below: Semgrep sends no usage data.
+      SEMGREP_SEND_METRICS: "off"
+    steps:
+      - name: Get the code with its full history (gitleaks scans every commit)
+        # actions/checkout v7.0.1, commit looked up from the release tag on 17 November 2026
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Python 3.13
+        # actions/setup-python v7.1.0, commit looked up from the release tag on 17 November 2026
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+
+      - name: Install the pinned scanners (requirements-ci.txt)
+        id: install
+        # --no-deps: install exactly the listed pins and nothing else. pip check then fails the run
+        # if a package needs something that is not pinned, instead of pip quietly fetching it.
+        run: |
+          python -m pip install --no-deps --only-binary=:all: -r requirements-ci.txt
+          python -m pip check
+
+      - name: Bandit (risky Python patterns in our code)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bandit -r src
+
+      - name: Semgrep (second code scanner, metrics off)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        # Rule sets p/python and p/security-audit from the Semgrep registry (Sam, 17 November 2026).
+        # --error makes any finding fail the step.
+        run: semgrep scan --config p/python --config p/security-audit --metrics=off --error src notebooks
+
+      - name: pip-audit (known security holes in pinned packages)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        # --no-deps --disable-pip: check exactly the pins in each file, without installing anything.
+        # --strict: fail if a package could not be checked at all.
+        #
+        # requirements.txt (the app): no exceptions. Every known hole fails the run.
+        #
+        # requirements-ci.txt (scanners only, never installed in Colab): exactly 6 accepted holes
+        # (Sam, 17 November 2026). Semgrep 1.185.0, the newest, requires exactly mcp==1.29.0 and
+        # opentelemetry-api~=1.37.0, so no fixed version can be installed. Here Semgrep only reads our
+        # files on a throwaway GitHub machine: it runs no MCP server or client and receives no web requests.
+        #   mcp 1.29.0:
+        #     CVE-2026-59951   MCP HTTP server never frees session state. We run no MCP server.
+        #     CVE-2026-116685  MCP HTTP client follows redirects to other hosts. We run no MCP client.
+        #     CVE-2026-116684  MCP server login does not check who a token is for. We run no MCP server.
+        #     CVE-2026-116686  MCP client fetches $ref URLs in a tool schema. We run no MCP client.
+        #   opentelemetry-api 1.37.0:
+        #     CVE-2026-114603  slow regex on an incoming "tracestate" web header. Nothing sends us headers.
+        #     CVE-2026-126360  slow regex on an incoming "traceparent" web header. Nothing sends us headers.
+        # Remove these lines as soon as a Semgrep release allows the fixed versions.
+        run: |
+          pip-audit -r requirements.txt --no-deps --disable-pip --strict --progress-spinner off
+          pip-audit -r requirements-ci.txt --no-deps --disable-pip --strict --progress-spinner off \
+            --ignore-vuln CVE-2026-59951 \
+            --ignore-vuln CVE-2026-116685 \
+            --ignore-vuln CVE-2026-116684 \
+            --ignore-vuln CVE-2026-116686 \
+            --ignore-vuln CVE-2026-114603 \
+            --ignore-vuln CVE-2026-126360
+
+      - name: gitleaks (keys and tokens anywhere in the git history)
+        if: ${{ !cancelled() }}
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          # SHA-256 of gitleaks_8.30.1_linux_x64.tar.gz, from the release's checksums file,
+          # checked on 17 November 2026. A different file fails the step before it runs.
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          cd "$RUNNER_TEMP"
+          file="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$file" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${file}"
+          echo "${GITLEAKS_SHA256}  ${file}" | sha256sum --check --strict -
+          tar -xzf "$file" gitleaks
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner --exit-code 1

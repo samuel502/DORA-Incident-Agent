@@ -33,7 +33,7 @@ from dora_agent.rules.facts import HUMAN_CONFIRMED, Fact, IncidentFacts
 # Line breaks and other C0/C1 control characters, Unicode line and paragraph separators, bidi controls
 # (U+202A-U+202E, U+2066-U+2069, U+200E/F, U+061C), zero-width characters and the byte order mark.
 _UNSAFE_ON_ONE_LINE = re.compile(
-    "[\x00-\x1f\x7f-\x9f  ‪-‮⁦-⁩​-‏؜﻿]+")
+    "[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069\u200b-\u200f\u061c\ufeff]+")
 _SPACES = re.compile(r"\s+")
 
 # Longest text a trace line shows from one free-text field. The full text is in the raw JSON tab.

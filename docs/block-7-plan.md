@@ -23,7 +23,7 @@ Sources: `docs/build-contract.md` (block 7: "Security tests and automated checks
 - A test that passes on Windows but fails on Linux (file paths, line endings, time zones). I fix the test or the code, never skip it.
 - A package that installs differently on Linux. The pins were already resolved for Linux in block 6, so this is unlikely.
 
-**How long.** Estimate 2 to 3 minutes per run (about 1 minute install, about 1 to 1.5 minutes tests). I report the real time after the first run.
+**How long.** Measured: 40 seconds for the whole run on GitHub, green (first run, 17 November 2026). The estimate was 2 to 3 minutes.
 
 **Decided:** Python 3.13 only, the version Colab runs (Sam, 17 November 2026).
 
@@ -43,6 +43,23 @@ Four scans, each its own job, running at the same time as the tests. Any finding
 **Decided:** Semgrep rule sets `p/python` and `p/security-audit` from the Semgrep registry (Sam, 17 November 2026).
 
 **Total CI time for a + b:** the jobs run side by side, so about 3 to 4 minutes per push (estimate).
+
+### What was built and found (17 November 2026)
+
+Built as one `scans` job next to the `tests` job, instead of four jobs: the four scanners come from one `requirements-ci.txt`, so one install serves all of them. Each scan step still runs even if an earlier one failed, so every run shows all four results.
+
+Versions: Bandit 1.9.4, Semgrep 1.185.0, pip-audit 2.10.1 (with 82 pulled-in packages, 85 pins in all), gitleaks 8.30.1 (Linux download checked against its SHA-256).
+
+Local run first (Sam, 17 November 2026: in a throwaway environment in the scratchpad, not the main Python):
+
+| Scanner | Finding | What was done |
+|---|---|---|
+| Bandit | B104, `0.0.0.0` in `ui/launch.py` | Accepted as decided, `# nosec B104` with the reason next to it |
+| Bandit | B613 "Trojan Source": 10 invisible Unicode characters (line and paragraph separators, text-direction controls, zero-width characters, byte order mark) typed directly into the regex in `ui/views.py:36` | Fixed, not suppressed: the same characters are now written as visible escape codes (`‪` ...). Checked that the pattern is identical. No invisible characters left in the file |
+| Semgrep | none (201 rules, 49 files) | nothing |
+| gitleaks | none (33 commits, and every current file) | No allow list added: the fake test keys are not flagged, so an allow list would only be an unused gap |
+| pip-audit, `requirements.txt` | Pillow 12.3.0: 42 known holes, all in reading image files. Fixed in Pillow 13.0.0, which Gradio 6.30.0 does not allow (`pillow<13`). Gradio 6.32.0 (12 November 2026) allows it | Fixed (Sam, 17 November 2026): Gradio 6.30.0 to 6.32.0 and Pillow 12.3.0 to 13.0.0. Nothing else had to move (Gradio's only other change is Brotli at least 1.2.1, already pinned). All 60 pins resolve for Linux on Python 3.13 with ready-built wheels. pip-audit now finds nothing |
+| pip-audit, `requirements-ci.txt` | `mcp` 1.29.0 (4 holes, MCP servers and clients over HTTP) and `opentelemetry-api` 1.37.0 (2 holes, parsing incoming trace headers). Semgrep 1.185.0, the newest, requires exactly these versions | Accepted (Sam, 17 November 2026): exactly these 6 IDs, only for `requirements-ci.txt`, each with its reason in `ci.yml`. Semgrep only reads our files on a throwaway machine: no MCP server or client, no incoming web requests. To be removed when Semgrep allows the fixed versions |
 
 ## Step c) Hash-pinned requirements
 
@@ -136,3 +153,5 @@ a, then b, then c, then d1, then e (offline parts), then d2/d3 and the live part
 3. Bandit B104 on `launch.py:38`: marked with `# nosec B104` and a reason.
 4. Fuzzing: Hypothesis.
 5. `docs/security-report.md` is written in this block.
+
+Second local run after both decisions (17 November 2026): Bandit no issues, Semgrep 0 findings, pip-audit no known holes in `requirements.txt` and none in `requirements-ci.txt` apart from the 6 accepted, gitleaks no leaks.

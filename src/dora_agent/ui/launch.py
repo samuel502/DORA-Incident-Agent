@@ -35,7 +35,9 @@ NOT_COLAB = ("This tool runs in Google Colab only. Open notebooks/colab.ipynb in
 # Exactly what launch() passes to Gradio. A test checks these, so they can't drift.
 LAUNCH_SETTINGS: dict[str, Any] = {
     "share": False,
-    "server_name": "0.0.0.0",
+    # Accepted (Sam, 17 November 2026): Colab's forwarding must reach the page inside the Colab machine,
+    # which has no public address, and share=False means no public link. See the module docstring.
+    "server_name": "0.0.0.0",  # nosec B104
     "server_port": PORT,
     "inline": False,
     "prevent_thread_lock": True,
