@@ -12,7 +12,8 @@ server_name="0.0.0.0" lets Colab's forwarding reach the page inside the Colab ma
 no public address, and nothing here creates a public link.
 
 Also: no API page in the footer, error details hidden from the page (they go to the notebook output),
-and downloads served only from logs/runs/ (the approved notifications).
+and downloads served only from /content/dora_outputs/ (controller.OUTPUT_DIR: the approved notifications'
+text and JSON files). The decision logs in logs/runs/ are not served.
 """
 
 from __future__ import annotations
@@ -70,7 +71,8 @@ def launch(*, build: Callable[[], Any] | None = None, colab_output: Any = None) 
         build = build_app
     demo = build()
     controller.RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
-    demo.launch(**LAUNCH_SETTINGS, allowed_paths=[str(controller.RUN_LOG_DIR)])
+    controller.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    demo.launch(**LAUNCH_SETTINGS, allowed_paths=[str(controller.OUTPUT_DIR)])
     _running = demo
     key_loaded = bool(os.environ.get(llm_settings().api_key_env, "").strip())
     print("The page is running below. Re-run this cell to restart it."

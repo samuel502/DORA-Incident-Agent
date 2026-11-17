@@ -46,6 +46,7 @@ class StandInOutput:
 def fresh(monkeypatch, tmp_path):
     monkeypatch.setattr(launcher, "_running", None)
     monkeypatch.setattr(controller, "RUN_LOG_DIR", tmp_path / "runs")
+    monkeypatch.setattr(controller, "OUTPUT_DIR", tmp_path / "dora_outputs")
 
 
 def start(events):
@@ -71,7 +72,8 @@ def test_launch_settings_are_the_osint_ones():
     assert settings["show_error"] is False
     assert "api" not in settings["footer_links"]
     assert settings["server_port"] == launcher.PORT
-    assert settings["allowed_paths"] == [str(controller.RUN_LOG_DIR)]
+    assert settings["allowed_paths"] == [str(controller.OUTPUT_DIR)]  # only the saved notifications
+    assert controller.OUTPUT_DIR.is_dir()
     assert not {"auth", "share_server_address", "mcp_server"} & set(settings)
 
 

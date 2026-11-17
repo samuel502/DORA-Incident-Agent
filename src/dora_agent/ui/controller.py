@@ -43,6 +43,12 @@ log = logging.getLogger(__name__)
 SAMPLES_PATH = PROJECT_ROOT / "cases" / "samples.json"
 # Decision logs and approved notifications of runs made on the page (git-ignored, like all of logs/).
 RUN_LOG_DIR = PROJECT_ROOT / "logs" / "runs"
+# Where the approved notification's text and JSON files are saved (Sam, 16 November 2026). The download
+# buttons don't download inside Colab: the page is shown in an embedded frame that is not allowed to start
+# downloads. So each file is also saved in this fixed folder of the Colab runtime, which shows in Colab's Files
+# panel. Synthetic data only; nothing is sent. The folder is gone when the runtime ends.
+OUTPUT_DIR = Path("/content/dora_outputs")
+FILES_PANEL_NOTE = "Download it from the Files panel on the left (right-click, Download)."
 
 UNEXPECTED = ("Something went wrong. Nothing was decided or sent. The details are in the notebook's "
               "output below the launch cell, not on this page.")
@@ -94,6 +100,7 @@ class Screen:
     can_approve: bool = False
     approved: str = ""
     downloads: tuple[str, str] | None = None
+    saved: str = ""  # where the files were saved, and how to download them from the Files panel
     # A refusal, shown in a box next to the button that was pressed (Sam, 16 November 2026).
     notice: str = ""
     notice_at: str = ""  # "run", "send", "draft" or "approve"; empty when nothing was refused
@@ -204,6 +211,7 @@ def screen(session: Session, status: str = "", *, reset_inputs: bool = False, no
         can_approve=session.draft is not None and approved is None,
         approved=views.notification_text(approved, sample=session.sample) if approved else "",
         downloads=session.downloads,
+        saved=saved_text(session.downloads),
         notice=notice,
         notice_at=notice_at,
     )
@@ -335,8 +343,12 @@ def make_draft(session: Session, causes: str) -> Screen:
 
 def approve_draft(session: Session, approver: str, discovery: str | None, plan_activated: str | None,
                   third_party: str, other: str, description: str, *,
-                  out_dir: Path | None = RUN_LOG_DIR) -> Screen:
-    """Approve: the person approves the draft. Nothing is sent. Text and JSON files are offered to download."""
+                  out_dir: Path | None = None) -> Screen:
+    """Approve: the person approves the draft. Nothing is sent.
+
+    The text and JSON files are saved in out_dir (default: OUTPUT_DIR, read when the button is pressed), offered
+    on the download buttons, and named on the page with how to get them from Colab's Files panel.
+    """
 
     def action() -> Screen:
         if session.draft is None or session.run is None:
@@ -358,8 +370,7 @@ def approve_draft(session: Session, approver: str, discovery: str | None, plan_a
                             description=(description or "").strip() or None)
         session.approved = approve(session.draft, human, approved_by=(approver or "").strip(),
                                    log=session.run.log)
-        if out_dir is not None:
-            session.downloads = _write_downloads(session.approved, out_dir, sample=session.sample)
+        session.downloads = _write_downloads(session.approved, out_dir or OUTPUT_DIR, sample=session.sample)
         return screen(session, "Approved. NOT SENT: this tool never sends anything.")
 
     return _guarded(action, session, "approve")
@@ -372,6 +383,15 @@ def _write_downloads(approved: ApprovedNotification, out_dir: Path, *, sample: b
     text_path.write_text(views.notification_text(approved, sample=sample) + "\n", encoding="utf-8")
     json_path.write_text(views.notification_json(approved) + "\n", encoding="utf-8")
     return str(text_path), str(json_path)
+
+
+def saved_text(downloads: tuple[str, str] | None) -> str:
+    """Plain text for the page: the exact saved files and how to download them in Colab. Empty if none."""
+    if not downloads:
+        return ""
+    names = "\n".join(Path(p).as_posix() for p in downloads)
+    return (f"Saved in this Colab runtime:\n{names}\n{FILES_PANEL_NOTE} Synthetic data only; nothing is sent. "
+            "The files are deleted when the runtime ends.")
 
 
 # Every question and every possible ticket suggestion gets its own fixed place on the page.

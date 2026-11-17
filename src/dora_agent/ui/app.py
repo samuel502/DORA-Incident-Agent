@@ -164,6 +164,9 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                                   buttons=["copy"])
             download_text = gr.DownloadButton("Download as text", visible=False)
             download_json = gr.DownloadButton("Download as JSON", visible=False)
+            # The buttons don't download inside Colab, so the page also names the saved files (plain text).
+            saved = gr.Textbox(label="Saved files (if the buttons don't download)", interactive=False, lines=4,
+                               visible=False)
 
         outputs = [state, status, headline, human_panel, service_group, service_answer]
         for group, answer, estimate in question_boxes.values():
@@ -174,6 +177,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                     download_text, download_json]
         notices = dict(zip(c.BUTTONS, (run_notice, send_notice, draft_notice, approve_notice)))
         outputs += list(notices.values())
+        outputs.append(saved)
 
         def render(session: c.Session, shown: c.Screen) -> list:
             reset = shown.reset_inputs
@@ -206,6 +210,7 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
             for button in notices:
                 here = shown.notice_at == button
                 values.append(gr.update(value=shown.notice if here else "", visible=here))
+            values.append(gr.update(value=shown.saved, visible=bool(shown.saved)))
             return values
 
         def session_of(value) -> c.Session:
