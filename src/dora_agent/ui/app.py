@@ -160,24 +160,20 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                 approve_button = gr.Button("Approve (nothing is sent)", variant="primary")
             # Outside the approval form, so a refusal after approval (form hidden) still shows.
             approve_notice = _notice_box()
+            # The copy button is how the text leaves the page. There are no download buttons: they don't work
+            # inside the Colab frame (Sam, 16 November 2026). The files are saved in the runtime and downloaded
+            # with the notebook cell "Download your last approved notification" (launch.download_last_approved).
             approved = gr.Textbox(label="Approved initial notification: NOT SENT", interactive=False, lines=20,
                                   buttons=["copy"])
-            download_text = gr.DownloadButton("Download as text", visible=False)
-            download_json = gr.DownloadButton("Download as JSON", visible=False)
-            # The buttons don't download inside Colab, so the page also names the saved files (plain text).
-            saved = gr.Textbox(label="Saved files (if the buttons don't download)", interactive=False, lines=4,
-                               visible=False)
 
         outputs = [state, status, headline, human_panel, service_group, service_answer]
         for group, answer, estimate in question_boxes.values():
             outputs += [group, answer, estimate]
         for group, text, choice, value, estimate in review_boxes.values():
             outputs += [group, text, choice, value, estimate]
-        outputs += [result, facts, trace, trace_json, draft_panel, draft, approve_panel, approved,
-                    download_text, download_json]
+        outputs += [result, facts, trace, trace_json, draft_panel, draft, approve_panel, approved]
         notices = dict(zip(c.BUTTONS, (run_notice, send_notice, draft_notice, approve_notice)))
         outputs += list(notices.values())
-        outputs.append(saved)
 
         def render(session: c.Session, shown: c.Screen) -> list:
             reset = shown.reset_inputs
@@ -201,16 +197,12 @@ def build_app(provider_factory: Callable[[], LlmProvider] = get_provider) -> gr.
                            gr.update(value=None) if reset else gr.update(),
                            gr.update(value="") if reset else gr.update(),
                            gr.update(value=False) if reset else gr.update()]
-            files = shown.downloads
             values += [shown.result, shown.facts, shown.trace, shown.trace_json,
                        gr.update(visible=shown.can_draft or bool(shown.draft)), shown.draft,
-                       gr.update(visible=shown.can_approve), shown.approved,
-                       gr.update(value=files[0], visible=True) if files else gr.update(value=None, visible=False),
-                       gr.update(value=files[1], visible=True) if files else gr.update(value=None, visible=False)]
+                       gr.update(visible=shown.can_approve), shown.approved]
             for button in notices:
                 here = shown.notice_at == button
                 values.append(gr.update(value=shown.notice if here else "", visible=here))
-            values.append(gr.update(value=shown.saved, visible=bool(shown.saved)))
             return values
 
         def session_of(value) -> c.Session:

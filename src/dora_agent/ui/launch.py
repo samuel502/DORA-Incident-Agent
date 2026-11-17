@@ -12,14 +12,15 @@ server_name="0.0.0.0" lets Colab's forwarding reach the page inside the Colab ma
 no public address, and nothing here creates a public link.
 
 Also: no API page in the footer, error details hidden from the page (they go to the notebook output),
-and downloads served only from /content/dora_outputs/ (controller.OUTPUT_DIR: the approved notifications'
-text and JSON files). The decision logs in logs/runs/ are not served.
+and no files served by the page at all (no allowed_paths): the approved notification's files are saved in
+/content/dora_outputs/ and downloaded with the notebook cell that calls download_last_approved().
 """
 
 from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from dora_agent.config import llm_settings
@@ -72,9 +73,50 @@ def launch(*, build: Callable[[], Any] | None = None, colab_output: Any = None) 
     demo = build()
     controller.RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
     controller.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    demo.launch(**LAUNCH_SETTINGS, allowed_paths=[str(controller.OUTPUT_DIR)])
+    demo.launch(**LAUNCH_SETTINGS)
     _running = demo
     key_loaded = bool(os.environ.get(llm_settings().api_key_env, "").strip())
     print("The page is running below. Re-run this cell to restart it."
           + ("" if key_loaded else " No Groq key is loaded yet: run the key cell first, or Run will say so."))
     output.serve_kernel_port_as_iframe(PORT, height=FRAME_HEIGHT)
+
+
+# ---------- the notebook's download cell (Sam, 16 November 2026) ----------
+
+NO_APPROVED_YET = ("No approved notification yet. Approve one on the page above, then run this cell again.")
+
+
+def newest_approved(folder: Path | None = None) -> tuple[Path, ...]:
+    """The text and JSON file of the newest approved notification in the folder, or () if there is none.
+
+    Both files come from the same run: the newest .txt, and the .json with the same name next to it.
+    """
+    folder = folder or controller.OUTPUT_DIR
+    if not folder.is_dir():
+        return ()
+    texts = sorted(folder.glob("initial-notification-*.txt"), key=lambda p: (p.stat().st_mtime, p.name))
+    if not texts:
+        return ()
+    newest = texts[-1]
+    pair = newest.with_suffix(".json")
+    return (newest, pair) if pair.is_file() else (newest,)
+
+
+def download_last_approved(*, colab_files: Any = None, folder: Path | None = None) -> None:
+    """Download the newest approved notification's files to your own computer, with Colab's files.download.
+
+    Synthetic data only. Nothing is sent anywhere else. Returns nothing, so Colab prints nothing extra.
+    colab_files, folder: only for tests, to pass stand-ins for google.colab.files and the folder.
+    """
+    if colab_files is None:
+        try:
+            from google.colab import files as colab_files  # only exists inside Colab
+        except ImportError:
+            raise RuntimeError(NOT_COLAB) from None
+    found = newest_approved(folder)
+    if not found:
+        print(NO_APPROVED_YET)
+        return
+    for path in found:
+        print(f"Downloading {path.name}")
+        colab_files.download(str(path))

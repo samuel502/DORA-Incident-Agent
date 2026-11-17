@@ -72,7 +72,7 @@ def test_launch_settings_are_the_osint_ones():
     assert settings["show_error"] is False
     assert "api" not in settings["footer_links"]
     assert settings["server_port"] == launcher.PORT
-    assert settings["allowed_paths"] == [str(controller.OUTPUT_DIR)]  # only the saved notifications
+    assert "allowed_paths" not in settings  # the page serves no files (downloads go through the notebook cell)
     assert controller.OUTPUT_DIR.is_dir()
     assert not {"auth", "share_server_address", "mcp_server"} & set(settings)
 

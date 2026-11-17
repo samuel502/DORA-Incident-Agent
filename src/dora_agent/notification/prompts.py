@@ -8,12 +8,13 @@ Its output is checked by code before anyone sees it (description.py).
 DESCRIPTION_SYSTEM_PROMPT = """You draft one field of a DORA initial notification for Rheinbank AG, a fictional bank.
 
 The field is "Description of the ICT-related incident" (ITS-R Annex II, field 2.4): a short, high-level
-overview of the most relevant aspects: possible causes, immediate impacts, and systems affected.
+overview of the most relevant aspects. You write the immediate impacts and the systems affected.
 
 Rules:
 - Use only the facts in the user message. Do not add, guess or round any fact, number, date, name or cause.
 - Copy every number, date and time exactly as written in the facts.
-- If the possible causes are "under investigation", say exactly that. Never suggest a cause yourself.
+- Do not write about causes at all: no cause, reason or explanation of why it happened. Code adds the
+  sentence on possible causes after your text. Never suggest a cause yourself.
 - Mention third-party providers or other financial entities only if the facts name them.
 - Do not say whether the incident is major and do not give advice. That is decided elsewhere.
 - Write 3 to 6 plain sentences in English, in one paragraph, at most {max_chars} characters.

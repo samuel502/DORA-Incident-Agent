@@ -12,6 +12,11 @@ How ticket text is kept out (block 5b plan, approved by Sam on 6 November 2026):
    no markup, no tool calls, and every number in it must appear in the fact list.
    If any check fails, or the AI can't be reached, a description written by code is used instead.
 4. Possible causes stay "under investigation" unless a human types them.
+5. The AI never writes about causes, and never sees them (live Colab test, Sam, 16 November 2026: the AI turned
+   "failed platform migration" into "the possible cause has been identified as a failed platform migration",
+   which states the cause as confirmed). Code adds the cause sentence itself: the analyst's text exactly as given,
+   as "Possible cause, as stated by the analyst: ...", or "Possible causes: under investigation." An AI text that
+   mentions a cause is not used (check "mentions_cause"); the description written by code is used instead.
 
 This module sends nothing to anyone except the one LLM call through the provider interface (hard rule 7).
 """
@@ -33,6 +38,8 @@ from dora_agent.rules.facts import Frozen
 from dora_agent.rules.thresholds import EEA_MEMBER_STATES
 
 UNDER_INVESTIGATION = "under investigation"
+ANALYST_CAUSE = "Possible cause, as stated by the analyst: "
+NO_CAUSE_SENTENCE = f"Possible causes: {UNDER_INVESTIGATION}."
 WrittenBy = Literal["ai_draft", "code_fallback"]
 
 _CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f]")  # every control character except a line break
@@ -41,6 +48,9 @@ _EMAIL = re.compile(r"@")
 _MARKUP = re.compile(r"[<>`*#\[\]{}|\\]|^\s*[-+]\s", re.MULTILINE)
 _THOUSANDS = re.compile(r"(?<=\d)[,  '](?=\d{3}\b)")
 _NUMBER = re.compile(r"\d+")
+# Words that state or explain a cause. The AI must not write about causes at all: code adds that sentence.
+_CAUSE_WORDS = re.compile(r"\b(caus\w*|root|due to|because|attribut\w*|triggered|originat\w*|stemm\w*|"
+                          r"result(?:ed|s|ing)? from|reason\w*)\b", re.IGNORECASE)
 
 
 class Description(Frozen):
@@ -51,6 +61,7 @@ class Description(Frozen):
     problems: tuple[str, ...]  # why the AI text was not used (empty if it was)
     causes_from_human: bool
     fact_lines: tuple[str, ...]  # exactly what the AI was given (logged, hard rule 9)
+    cause_sentence: str  # written by code, the last sentence of the text
 
 
 # ---------- the fact list, built by code ----------
@@ -80,8 +91,19 @@ def check_causes(causes: str | None, settings: NotificationSettings) -> str | No
     return text
 
 
-def fact_lines(classification: Classification, causes: str | None = None) -> tuple[str, ...]:
-    """The AI's whole input: one line per confirmed fact. Only values the rules engine may use."""
+def cause_sentence(causes: str | None) -> str:
+    """The cause sentence, written by code. The analyst's text is repeated exactly as given (after check_causes),
+    framed as their statement, never as identified or confirmed. A full stop is added only if it has none."""
+    if not causes:
+        return NO_CAUSE_SENTENCE
+    end = "" if causes.endswith((".", "!", "?")) else "."
+    return f"{ANALYST_CAUSE}{causes}{end}"
+
+
+def fact_lines(classification: Classification) -> tuple[str, ...]:
+    """The AI's whole input: one line per confirmed fact. Only values the rules engine may use.
+
+    No causes: the cause sentence is written by code (cause_sentence), never by the AI."""
     facts = classification.facts
     use = facts.usable
     lines: list[str] = []
@@ -145,7 +167,6 @@ def fact_lines(classification: Classification, causes: str | None = None) -> tup
         lines.append(f"Costs and losses so far: EUR {_count(use('costs_eur'))}{_estimate(facts, 'costs_eur')}")
 
     lines.append(f"Classification criteria met: {'; '.join(criteria_met(classification))}")
-    lines.append(f"Possible causes: {causes if causes else UNDER_INVESTIGATION}")
     return tuple(lines)
 
 
@@ -161,8 +182,11 @@ def _numbers(text: str) -> set[str]:
     return {n.lstrip("0") or "0" for n in _NUMBER.findall(_THOUSANDS.sub("", text))}
 
 
-def check_ai_text(text: str, lines: tuple[str, ...], settings: NotificationSettings) -> tuple[str, list[str]]:
-    """Return the cleaned text and the list of problems. No problems means the text may be used."""
+def check_ai_text(text: str, lines: tuple[str, ...], settings: NotificationSettings,
+                  max_chars: int | None = None) -> tuple[str, list[str]]:
+    """Return the cleaned text and the list of problems. No problems means the text may be used.
+
+    max_chars: the AI's share of the field (the cause sentence by code takes the rest)."""
     problems: list[str] = []
     cleaned = text.strip()
     if not cleaned:
@@ -170,7 +194,7 @@ def check_ai_text(text: str, lines: tuple[str, ...], settings: NotificationSetti
     if _CONTROL.search(cleaned):
         problems.append("control_characters")
     cleaned = " ".join(cleaned.split())
-    if len(cleaned) > settings.max_description_chars:
+    if len(cleaned) > (settings.max_description_chars if max_chars is None else max_chars):
         problems.append("too_long")
     if _LINK.search(cleaned):
         problems.append("link")
@@ -178,6 +202,8 @@ def check_ai_text(text: str, lines: tuple[str, ...], settings: NotificationSetti
         problems.append("email")
     if _MARKUP.search(text):
         problems.append("markup")
+    if _CAUSE_WORDS.search(cleaned):
+        problems.append("mentions_cause")
     unknown = _numbers(cleaned) - _numbers("\n".join(lines))
     if unknown:
         problems.append("number_not_in_facts")
@@ -188,7 +214,8 @@ def check_ai_text(text: str, lines: tuple[str, ...], settings: NotificationSetti
 
 
 def fallback_text(lines: tuple[str, ...]) -> str:
-    """Plain sentences from the same fact list. Used when the AI text can't be used.
+    """Plain sentences from the same fact list. Used when the AI text can't be used. The cause sentence is
+    added after it, as after the AI's text.
 
     Who wrote it is shown in the field's note and source, not in the text itself.
     """
@@ -206,31 +233,36 @@ def describe_incident(classification: Classification, provider: LlmProvider, *, 
         raise NotMajor(f"no initial notification: the result is {classification.result}, not major")
     settings = settings or notification_settings()
     human_causes = check_causes(causes, settings)
-    lines = fact_lines(classification, human_causes)
+    lines = fact_lines(classification)
+    cause = cause_sentence(human_causes)
+    ai_chars = max(settings.max_description_chars - len(cause) - 1, 0)  # room left for the AI's sentences
 
     messages = [
-        Message(role="system", content=DESCRIPTION_SYSTEM_PROMPT.format(max_chars=settings.max_description_chars)),
+        Message(role="system", content=DESCRIPTION_SYSTEM_PROMPT.format(max_chars=ai_chars)),
         Message(role="user", content=DESCRIPTION_USER_PROMPT.format(facts="\n".join(f"- {line}" for line in lines))),
     ]
     problems: list[str]
     try:
         response = provider.chat(messages, [])  # no tools: the AI can only write text
-        cleaned, problems = check_ai_text(response.text, lines, settings)
+        cleaned, problems = check_ai_text(response.text, lines, settings, ai_chars)
         if response.tool_calls:
             problems.append("tool_call")
     except LlmError as error:
         cleaned, problems = "", [f"llm_error: {error.code or 'unavailable'}"]
 
     if problems:
-        description = Description(text=fallback_text(lines), written_by="code_fallback", problems=tuple(problems),
-                                  causes_from_human=human_causes is not None, fact_lines=lines)
+        description = Description(text=f"{fallback_text(lines)} {cause}", written_by="code_fallback",
+                                  problems=tuple(problems), causes_from_human=human_causes is not None,
+                                  fact_lines=lines, cause_sentence=cause)
     else:
-        description = Description(text=cleaned, written_by="ai_draft", problems=(),
-                                  causes_from_human=human_causes is not None, fact_lines=lines)
+        description = Description(text=f"{cleaned} {cause}", written_by="ai_draft", problems=(),
+                                  causes_from_human=human_causes is not None, fact_lines=lines,
+                                  cause_sentence=cause)
     if log is not None:
         log.write("notification_description", field="2.4", written_by=description.written_by,
                   problems=list(description.problems), causes_from_human=description.causes_from_human,
-                  fact_lines=list(lines), text=description.text, provider=getattr(provider, "name", "unknown"))
+                  fact_lines=list(lines), cause_sentence=cause, text=description.text,
+                  provider=getattr(provider, "name", "unknown"))
     return description
 
 
@@ -238,7 +270,8 @@ def description_field(description: Description) -> NotificationField:
     """Field 2.4, ready to replace the waiting placeholder from fields.code_fields()."""
     if description.written_by == "ai_draft":
         filled_by, source = "ai_draft", "AI draft from confirmed facts (no ticket text)"
-        note = "AI draft. Check every sentence against the facts before approving."
+        note = ("AI draft. Check every sentence against the facts before approving. The last sentence, on the "
+                "possible cause, is written by code.")
     else:
         filled_by, source = "code", "written by code from confirmed facts"
         note = ("Written by code from confirmed facts. The AI draft was not used ("

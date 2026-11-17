@@ -12,6 +12,7 @@ from dora_agent.config import NotificationSettings, notification_settings
 from dora_agent.llm.fake_provider import FakeProvider, call, say
 from dora_agent.llm.provider import LlmError, LlmResponse, ToolCall
 from dora_agent.notification.description import (
+    NO_CAUSE_SENTENCE,
     UNDER_INVESTIGATION,
     describe_incident,
     description_field,
@@ -61,7 +62,7 @@ def major(**extra):
 GOOD = ("Online banking (SVC-OLB), which supports a critical or important function, was unavailable from "
         "2026-11-05 08:00 UTC until normal service was restored at 08:30 UTC. The incident was detected at "
         "08:05 UTC and resolved at 09:00 UTC. 150,000 of 1,000,000 clients using the service were affected "
-        "in AT and DE. Possible causes are under investigation.")
+        "in AT and DE.")
 
 
 def draft(text_or_response, classification=None, **kwargs):
@@ -82,7 +83,7 @@ def test_good_ai_text_is_used_and_marked_as_ai_draft():
     result, fake = draft(GOOD)
     assert result.written_by == "ai_draft"
     assert result.problems == ()
-    assert result.text == GOOD
+    assert result.text == f"{GOOD} {NO_CAUSE_SENTENCE}"  # the cause sentence is added by code
     field = description_field(result)
     assert (field.number, field.filled_by, field.status) == ("2.4", "ai_draft", "filled")
     assert "Check every sentence" in field.note
@@ -105,12 +106,11 @@ def test_prompt_is_only_the_fact_list():
     assert "Online banking (SVC-OLB)" in user
     assert "Clients affected: 150,000 of 1,000,000 clients using the service" in user
     assert "EEA Member States affected: AT, DE" in user
-    assert f"Possible causes: {UNDER_INVESTIGATION}" in user
+    assert "Possible cause" not in user  # the AI never sees causes: code writes that sentence
 
 
 def test_numbers_written_differently_are_accepted():
-    text = ("Online banking was down on 5 November 2026 from 08:00 to 08:30 UTC. 150000 clients were affected. "
-            "Possible causes are under investigation.")
+    text = "Online banking was down on 5 November 2026 from 08:00 to 08:30 UTC. 150000 clients were affected."
     result, _ = draft(text)
     assert result.written_by == "ai_draft", result.problems
 
@@ -118,17 +118,19 @@ def test_numbers_written_differently_are_accepted():
 # ---------- human causes ----------
 
 
-def test_human_causes_go_into_the_facts():
+def test_human_causes_are_added_by_code_and_never_sent_to_the_ai():
     result, fake = draft(GOOD, causes="Faulty  load balancer\nconfiguration after a change")
     assert result.causes_from_human
-    assert "Possible causes: Faulty load balancer configuration after a change" in sent_text(fake)
-    assert UNDER_INVESTIGATION not in sent_text(fake).split("Possible causes:")[1]
+    assert result.text.endswith(" Possible cause, as stated by the analyst: Faulty load balancer configuration "
+                                "after a change.")
+    assert "load balancer" not in sent_text(fake)
 
 
 def test_blank_causes_stay_under_investigation():
     result, fake = draft(GOOD, causes="   ")
     assert not result.causes_from_human
-    assert f"Possible causes: {UNDER_INVESTIGATION}" in sent_text(fake)
+    assert result.text.endswith(f" Possible causes: {UNDER_INVESTIGATION}.")
+    assert "Possible cause" not in sent_text(fake)
 
 
 def test_causes_too_long_or_with_control_characters_are_refused():
@@ -175,8 +177,7 @@ def test_huge_number_from_the_ai_falls_back_instead_of_crashing():
 
 
 def test_leading_zeros_do_not_matter():
-    result, _ = draft("Online banking was down from 08:00 to 08:30 UTC on 2026-11-05. "
-                      "Possible causes are under investigation.")
+    result, _ = draft("Online banking was down from 08:00 to 08:30 UTC on 2026-11-05.")
     assert result.written_by == "ai_draft", result.problems
 
 
@@ -307,3 +308,81 @@ def test_description_module_never_touches_the_ticket_or_the_agent():
     names += [n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)]
     names += [n.arg for n in ast.walk(tree) if isinstance(n, ast.arg)]
     assert not [n for n in names if "ticket" in n.lower()]
+
+
+# ---------- the cause sentence is the analyst's, written by code (live Colab test, Sam, 16 November 2026) ----------
+
+from dora_agent.notification.description import ANALYST_CAUSE, cause_sentence  # noqa: E402
+from dora_agent.notification.prompts import DESCRIPTION_SYSTEM_PROMPT  # noqa: E402
+
+LIVE_AI_TEXT = (GOOD + " The possible cause has been identified as a failed platform migration.")
+
+
+def test_live_case_ai_stating_the_cause_as_identified_is_not_used():
+    result, _ = draft(LIVE_AI_TEXT, causes="failed platform migration")
+    assert result.written_by == "code_fallback" and "mentions_cause" in result.problems
+    assert "identified" not in result.text and "has been" not in result.text
+    assert result.text.endswith(" Possible cause, as stated by the analyst: failed platform migration.")
+    assert result.text.count("failed platform migration") == 1
+
+
+def test_analyst_cause_is_repeated_exactly_as_given_after_good_ai_text():
+    result, fake = draft(GOOD, causes="Failed platform migration (suspected)")
+    assert result.written_by == "ai_draft"
+    assert result.text == f"{GOOD} {ANALYST_CAUSE}Failed platform migration (suspected)."
+    assert result.cause_sentence == "Possible cause, as stated by the analyst: Failed platform migration (suspected)."
+    assert "platform migration" not in sent_text(fake)  # the AI never sees it, so it can't reword it
+
+
+def test_cause_sentence_keeps_the_analysts_own_full_stop():
+    assert cause_sentence("Failed platform migration.") == f"{ANALYST_CAUSE}Failed platform migration."
+    assert cause_sentence("Is it the migration?") == f"{ANALYST_CAUSE}Is it the migration?"
+    assert cause_sentence(None) == f"Possible causes: {UNDER_INVESTIGATION}."
+
+
+@pytest.mark.parametrize("words", [
+    "This was caused by a failed migration.", "The root of the problem is the migration.",
+    "It happened due to a migration.", "It stopped because of a migration.", "It was triggered by a change.",
+    "The outage resulted from a migration.", "The causes are under investigation.",
+    "The reason is a migration.", "The fault is attributed to a supplier.",
+])
+def test_ai_text_that_explains_a_cause_falls_back_to_code(words):
+    result, _ = draft(f"Online banking was down from 08:00 to 08:30 UTC. {words}", causes="failed migration")
+    assert result.written_by == "code_fallback" and "mentions_cause" in result.problems
+    assert result.text.endswith(f" {ANALYST_CAUSE}failed migration.")
+
+
+def test_fallback_with_analyst_cause_keeps_every_fact_and_the_exact_cause():
+    result, _ = draft("", causes="failed platform migration")
+    assert "Clients affected: 150,000 of 1,000,000 clients using the service." in result.text
+    assert result.text.endswith(f". {ANALYST_CAUSE}failed platform migration.")
+    assert "identified" not in result.text and "confirmed as" not in result.text
+
+
+def test_ai_gets_room_for_the_cause_sentence_and_the_whole_field_fits():
+    cause = "x" * SETTINGS.max_causes_chars
+    budget = SETTINGS.max_description_chars - len(cause_sentence(cause)) - 1
+    result, fake = draft("x" * (budget + 1), causes=cause)
+    assert "too_long" in result.problems
+    assert f"at most {budget} characters" in fake.calls[0][0][0].content
+    ok, _ = draft(GOOD, causes=cause)
+    assert ok.written_by == "ai_draft" and len(ok.text) <= SETTINGS.max_description_chars
+
+
+def test_prompt_forbids_writing_about_causes():
+    assert "Do not write about causes at all" in DESCRIPTION_SYSTEM_PROMPT
+    assert "Code adds the" in DESCRIPTION_SYSTEM_PROMPT
+
+
+def test_cause_sentence_is_logged():
+    log = DecisionLog("run-x")
+    result, _ = draft(GOOD, causes="failed platform migration", log=log)
+    (record,) = [r for r in log.records if r["kind"] == "notification_description"]
+    assert record["cause_sentence"] == result.cause_sentence and record["text"] == result.text
+
+
+def test_field_2_4_ends_with_the_analyst_cause():
+    result, _ = draft(LIVE_AI_TEXT, causes="failed platform migration")
+    field = description_field(result)
+    assert field.value.endswith(f"{ANALYST_CAUSE}failed platform migration.")
+    assert "identified" not in field.value
