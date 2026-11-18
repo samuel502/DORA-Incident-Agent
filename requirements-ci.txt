@@ -1,8 +1,11 @@
 # CI-only tools for the security scans (block 7 step b, docs/block-7-plan.md). Colab never installs this file.
 # Exact versions only, including every package these pull in. Hashes come in block 7 step c.
-# Resolved on 17 November 2026 for Linux on Python 3.13 (the CI and Colab version). Windows-only packages
-# (colorama, pywin32) are left out, because CI runs on Linux. CI installs this file with --no-deps and then
-# runs pip check, so a missing or wrong pin fails the run instead of pip quietly fetching another version.
+# Resolved on 17 November 2026 for Linux on Python 3.13 (the CI and Colab version). CI installs this file
+# with --no-deps and then runs pip check, so a missing or wrong pin fails the run instead of pip quietly
+# fetching another version.
+# Checked again on 18 November 2026 against the Linux / Python 3.13 wheels themselves: every dependency each
+# package declares for Linux is pinned here. colorama is needed on Linux too, because Semgrep requires it on
+# every system (colorama~=0.4.0). pywin32 is Windows-only and stays out.
 
 # Scanners
 bandit==1.9.4
@@ -22,6 +25,7 @@ cffi==2.1.1
 charset-normalizer==3.5.2
 click-option-group==0.5.10
 click==8.4.2
+colorama==0.4.6
 cryptography==50.0.2
 cyclonedx-python-lib==11.12.0
 defusedxml==0.7.1
