@@ -76,6 +76,15 @@ Local run first (Sam, 17 November 2026: in a throwaway environment in the scratc
 
 **How long.** Generating hashes: about 1 minute. Install time in Colab and CI stays about the same.
 
+### What was built and found (19 November 2026)
+
+- `scripts/hash_requirements.py` wrote the PyPI hashes of every published file of each pinned version: 60 pins in `requirements.txt`, 86 in `requirements-ci.txt`. No version changed (checked against the last commit).
+- CI (both installs) and the Colab setup cell install with `--require-hashes`.
+- Checked locally: pip downloaded, in hash-checking mode and with no cache, every wheel it would pick on Linux x86_64 with Python 3.13, for CI (Ubuntu 24.04) and Colab. All matched. A wrong hash is refused. The real fresh Linux install is the CI run and the Colab setup cell.
+- Scans: `scripts/` added to the CI Bandit and Semgrep scans (Sam, 19 November 2026). Semgrep rule `httpsconnection-detected` on the PyPI download in `scripts/hash_requirements.py` is marked `# nosemgrep` with its reason (Sam, 19 November 2026): the rule is about Pythons before 3.4.3, which did not check certificates. We run 3.11+, the certificate check is set explicitly, and the host is fixed to pypi.org.
+
+**Known limitation (for the security report).** In Colab, if a package is already installed at exactly the pinned version, pip keeps that copy and does not download it again, so that copy is not checked against our hashes. It is Google's preinstalled copy in Colab's own image, not a download from PyPI at install time. Every package that pip does download is hash-checked. Forcing a reinstall of everything (`--force-reinstall`) would close the gap, but makes the setup slower and causes more "restart needed" cases. Left as it is (Sam, 19 November 2026). CI is not affected: it starts from a fresh Python with nothing preinstalled.
+
 ## Step d) Attack tests on the AI (Promptfoo and garak)
 
 **Run by hand in Colab, with your own Groq key from Colab Secrets. Never in CI.**

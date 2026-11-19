@@ -49,7 +49,8 @@ jobs:
           python-version: "3.13"
 
       - name: Install the pinned requirements (same command as the Colab setup cell)
-        run: "python -m pip install --only-binary=:all: -r requirements.txt"
+        # --require-hashes: pip refuses any file whose SHA-256 is not listed in requirements.txt (step c).
+        run: "python -m pip install --require-hashes --only-binary=:all: -r requirements.txt"
 
       - name: Run the full test suite
         run: python -m pytest --junitxml=pytest-report.xml
@@ -98,19 +99,20 @@ jobs:
         id: install
         # --no-deps: install exactly the listed pins and nothing else. pip check then fails the run
         # if a package needs something that is not pinned, instead of pip quietly fetching it.
+        # --require-hashes: pip refuses any file whose SHA-256 is not listed in requirements-ci.txt (step c).
         run: |
-          python -m pip install --no-deps --only-binary=:all: -r requirements-ci.txt
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r requirements-ci.txt
           python -m pip check
 
       - name: Bandit (risky Python patterns in our code)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: bandit -r src
+        run: bandit -r src scripts
 
       - name: Semgrep (second code scanner, metrics off)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         # Rule sets p/python and p/security-audit from the Semgrep registry (Sam, 17 November 2026).
         # --error makes any finding fail the step.
-        run: semgrep scan --config p/python --config p/security-audit --metrics=off --error src notebooks
+        run: semgrep scan --config p/python --config p/security-audit --metrics=off --error src notebooks scripts
 
       - name: pip-audit (known security holes in pinned packages)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

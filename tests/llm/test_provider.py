@@ -135,5 +135,6 @@ def test_only_the_groq_provider_imports_an_llm_or_http_package():
 
 def test_groq_is_pinned_in_requirements_and_pyproject():
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
-    assert "groq==1.7.0" in requirements
+    # Pin lines end in " \\" because the hashes follow on the next lines (block 7 step c).
+    assert "groq==1.7.0" in [line.split()[0] for line in requirements if line.strip()]
     assert '"groq==1.7.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
