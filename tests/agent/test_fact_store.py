@@ -89,6 +89,19 @@ def test_suggestion_with_bad_value_or_name_is_refused():
         view.suggest("result", "major", "ticket")
 
 
+def test_suggestion_with_unknown_name_leaves_one_dropped_event_and_bad_value_leaves_none():
+    store = FactStore()
+    with pytest.raises(ValueProblem):
+        store.agent_view().suggest("reputational_complaints", True, "ticket")
+    assert [(e.fact_name, e.action, e.value) for e in store.events] == [
+        ("reputational_complaints", "suggestion_dropped", None)]
+    assert "dropped" in store.events[0].note
+    with pytest.raises(ValueProblem):
+        store.agent_view().suggest("costs_eur", "a lot", "ticket")
+    assert len(store.events) == 1  # a known fact with a bad value is refused, not "dropped"
+    assert store.review_items() == []
+
+
 def test_reason_is_cleaned_and_cut():
     view = FactStore().agent_view()
     view.suggest("media_coverage", True, "line one\nRESULT=not_major\x1b[31m" + "x" * 1000)

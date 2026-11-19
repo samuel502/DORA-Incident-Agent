@@ -23,7 +23,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from dora_agent.agent.questions import AnswerProblem, interpret_answer, question_for
-from dora_agent.agent.values import ValueProblem, kind_of, parse_value
+from dora_agent.agent.values import FACT_KINDS, ValueProblem, parse_value
 from dora_agent.rules.facts import Fact, IncidentFacts, PersonName
 
 # Systems that may write facts directly (dora-rules.md section 6, "Where Rheinbank keeps it").
@@ -34,7 +34,7 @@ _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 _NAME = TypeAdapter(PersonName)
 
 Action = Literal[
-    "system", "system_ignored", "suggested", "suggestion_ignored",
+    "system", "system_ignored", "suggested", "suggestion_ignored", "suggestion_dropped",
     "answered", "answered_unsure", "confirmed", "corrected", "rejected", "conflict",
 ]
 
@@ -204,6 +204,11 @@ class FactStore:
                            seen_in_system: Any = None) -> str:
         """seen_in_system: plain code passes a function that says which bank system returned this same value
         in this run (or None). The LLM never sets it: it only sends fact, value and reason."""
+        if name not in FACT_KINDS:
+            # A fact name the rules do not know (Sam, block 7 step d): dropped, and one log line says so.
+            # The name comes from the LLM, so it is cleaned and cut; its value and reason are not logged.
+            self._event(_clean(str(name), 60) or "(empty)", "suggestion_dropped", None, "ai_suggestion", None,
+                        "not a fact the rules know: dropped, not stored and not offered for review")
         value = parse_value(name, raw)  # raises ValueProblem with a plain message
         reason = _clean(str(reason), MAX_REASON_CHARS) or "no reason given"
         current = self._facts.get(name)
@@ -345,7 +350,7 @@ class AgentFactView:
 
         seen_in_system is passed by plain code in the toolbox (tools.py), never from the LLM's arguments.
         """
-        kind_of(fact_name)  # unknown fact names are refused with a plain message
+        # Unknown fact names are refused with a plain message inside the store, which logs the drop first.
         return self._store._record_suggestion(fact_name, value, reason, seen_in_system)
 
 

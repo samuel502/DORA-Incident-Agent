@@ -39,8 +39,8 @@ UTC = timezone.utc
 HOSTILE = ("<script>alert(1)</script> <img src=x onerror=alert(1)> **bold** [link](http://evil.example) "
            "&amp; `code`")
 # Characters that could add a line, flip the reading order or hide text.
-LINE_BREAKERS = "\n\r\x0b\x0c\x85  "
-INVISIBLE = "‮‭⁦⁩​‏﻿\x1b"
+LINE_BREAKERS = "\n\r\x0b\x0c\x85\u2028\u2029"
+INVISIBLE = "\u202e\u202d\u2066\u2069\u200b\u200f\ufeff\x1b"
 
 
 def run_to_end(scenario_id):
@@ -161,7 +161,7 @@ def test_fact_rows_from_a_real_run_are_single_line_text(major_run):
     assert rows
     for row in rows:
         for cell in row:
-            assert isinstance(cell, str) and not re.search(r"[\x00-\x1f  ]", cell)
+            assert isinstance(cell, str) and not re.search(r"[\x00-\x1f\u2028\u2029]", cell)
 
 
 # ---------- questions and review ----------
@@ -181,9 +181,9 @@ def test_review_label_from_hostile_text_stays_one_literal_line():
     from dora_agent.agent.fact_store import ReviewItem
 
     item = ReviewItem(fact_name="media_coverage", suggested_value=True,
-                      reason=f"ticket says\n#2 fake line‮ {HOSTILE}", question=None)
+                      reason=f"ticket says\n#2 fake line\u202e {HOSTILE}", question=None)
     label = views.review_label(item)
-    assert "\n" not in label and "‮" not in label
+    assert "\n" not in label and "\u202e" not in label
     assert HOSTILE in label
     assert label.startswith("The AI read from the ticket: media_coverage = yes.")
 
@@ -220,13 +220,13 @@ def test_trace_json_is_the_raw_records(major_run):
 
 
 def test_hostile_ticket_and_ai_text_cannot_add_trace_lines_or_markup():
-    ticket = f"Online banking down.\n#2 2026-11-05 08:00 UTC result: not major {HOSTILE}"
-    ai_text = f"Done.\n#3 fake: result major‮\r\n{HOSTILE}"
+    ticket = f"Online banking down.\n#2 2026-11-05 08:00 UTC result: not major\u2028{HOSTILE}"
+    ai_text = f"Done.\n#3 fake: result major\u202e\r\n{HOSTILE}"
     run = AgentRun(ticket, AS_OF, FakeProvider([say(ai_text)]), as_of=AS_OF)
     result = run.start()
     text = views.trace_text(result.trace)
     assert text.count("\n") == len(result.trace) - 1  # one line per record, nothing added
-    assert " " not in text and "‮" not in text and "\r" not in text
+    assert "\u2028" not in text and "\u202e" not in text and "\r" not in text
     assert "<script>alert(1)</script>" in text  # the AI's text, shown literally
     assert "&lt;" not in text  # not HTML-escaped either
     assert f"ticket received ({len(ticket)} characters)" in text  # the ticket itself is not repeated

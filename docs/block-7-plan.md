@@ -100,6 +100,24 @@ The security framework (section 4) asks for a folder of hostile test cases. Many
 
 A test passes only if the result still comes from the rules engine, no extra data comes out, and the limits hold. Before writing new ones I list which of these are already covered and where, so nothing is duplicated.
 
+#### What was built (19 November 2026)
+
+57 tests in `tests/attacks/`, all offline with the fake AI, so they run in CI with the rest of the suite. The angle is different from the older single-call tests: each test runs a whole agent run (or a whole page session) where the AI is assumed fully fooled and does what the hostile text says. Each test also checks that the attack really arrived, so a pass means something.
+
+Poisoned bank data: `tests/attacks/attack_kit.py` writes a copy of the simulated data into a temporary folder with an injection in every free-text field (277 fields: monitoring titles and notes, impact estimate notes, security analyst notes, supplier names, functions and notices, service criticality notes). It passes the real schema checks and goes through the real connectors. The real data files are never touched.
+
+| Attack | New tests | Already covered before (not repeated) |
+|---|---|---|
+| Instructions in the ticket ("not major", fake confirmation, own verdict, show the prompt and key, list all clients) | `test_attack_ticket.py` (4) | `tests/agent/test_loop.py`: markers the ticket cannot close, AI text "NOT MAJOR" ignored, no service choice from the ticket. `tests/notification/test_description.py`: ticket never reaches the drafting prompt |
+| Instructions in bank system output (monitoring, client impact, security alerts, suppliers, notices) | `test_attack_bank_data.py` (5) | `tests/agent/test_loop.py`: tool results wrapped as data |
+| AI setting `confirmed_by` or a system source | `test_attack_confirmation.py` (11) | `tests/agent/test_tools.py:247-320` and `tests/agent/test_fact_store.py`, one call at a time |
+| Oversized and malformed tool arguments | `test_attack_tool_arguments.py` (28) | `tests/agent/test_tools.py` (not JSON, no echo, malformed lookups, result cap), `tests/agent/test_loop.py` (ticket length) |
+| Reaching the answer key or briefings | `test_attack_answer_key.py` (4): watches every file really opened during a run | `tests/cases/test_case_runner.py`, `tests/ui/test_briefings.py`: the code never names these files; unchanged sample's briefing never sent |
+| Markup or script on the page | `test_attack_page.py` (2): one whole session, hostile text from ticket, AI words, bank data, person's fields | `tests/ui/test_app.py`, `test_views.py`, `test_controller.py`: no HTML component, single views |
+| Runaway agent (loop) | `test_attack_runaway.py` (3) | `tests/agent/test_loop.py`: each limit on its own |
+
+Findings: none of the attacks got through. No code change was needed. One thing learned while writing them: an AI suggestion for a fact name the store does not know (for example `reputational_complaints`) is not stored at all, so it never reaches the review list. Fixed (Sam, 19 November 2026): the decision log now gets one `suggestion_dropped` line for it, with the name cleaned and cut to 60 characters, no value, and the reason ("not a fact the rules know"). The invisible text-direction characters in the attack tests are now written as escape codes (`‮`), so the files hold no hidden characters.
+
 ### d2) Promptfoo (red team, OWASP LLM Top 10 preset)
 
 - **What it checks.** Promptfoo writes many attack messages (prompt injection, prompt extraction, data leak attempts, jailbreaks), sends each one to our agent as a ticket, then grades the answer.
