@@ -1,0 +1,8 @@
+{
+  "name": "dora-agent-redteam",
+  "private": true,
+  "description": "Pinned Promptfoo for the optional red team notebook. Installed only with npm ci from package-lock.json.",
+  "dependencies": {
+    "promptfoo": "0.125.1"
+  }
+}

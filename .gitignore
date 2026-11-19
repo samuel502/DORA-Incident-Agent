@@ -23,3 +23,6 @@ dist/
 
 # Local logs (block 5 writes decision logs here)
 logs/
+
+# Red team notebook (block 7 d2): Promptfoo installed by npm ci in Colab, never committed
+redteam/node_modules/
