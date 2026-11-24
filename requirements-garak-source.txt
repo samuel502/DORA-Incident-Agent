@@ -1,0 +1,9 @@
+# garak red team environment, second install step (block 7 d3). NOT for the app, NOT for CI.
+# langdetect 1.0.9 has no ready-built file for Python 3 on PyPI (only an old Python 2 one), so it is built from
+# its source here: pip --require-hashes --no-deps --no-binary=:all: --no-build-isolation. "No build isolation"
+# means the build uses setuptools from the folder the first step installed (hash-checked, requirements-garak.txt)
+# instead of downloading a build tool without a hash check. langdetect is plain Python (setup.py, setuptools).
+# After changing a version, re-run: python scripts/hash_requirements.py requirements-garak-source.txt
+langdetect==1.0.9 \
+    --hash=sha256:7cbc0746252f19e76f77c0b1690aadf01963be835ef0cd4b56dddf2a8f1dfc2a \
+    --hash=sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0
