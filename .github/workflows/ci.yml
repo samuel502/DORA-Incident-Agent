@@ -121,28 +121,59 @@ jobs:
         #
         # requirements.txt (the app): no exceptions. Every known hole fails the run.
         #
-        # requirements-ci.txt (scanners only, never installed in Colab): exactly 6 accepted holes
-        # (Sam, 17 November 2026). Semgrep 1.185.0, the newest, requires exactly mcp==1.29.0 and
-        # opentelemetry-api~=1.37.0, so no fixed version can be installed. Here Semgrep only reads our
-        # files on a throwaway GitHub machine: it runs no MCP server or client and receives no web requests.
+        # requirements-ci.txt (scanners only, never installed in Colab): exactly 8 accepted holes
+        # (Sam, 17 November 2026: the first 6; 23 November 2026: CVE-2026-115563 and CVE-2026-132276).
+        # Semgrep 1.185.0 (ours) and 1.186.0 (the newest) require exactly mcp==1.29.0,
+        # opentelemetry-api~=1.37.0 and wcmatch~=8.3, so no fixed version can be installed (mcp: fixed in
+        # 1.30.0; wcmatch: fixed in 11.2). Here Semgrep only reads our files on a throwaway GitHub machine:
+        # it runs no MCP server or client, receives no web requests, and matches only our repo's file names.
         #   mcp 1.29.0:
         #     CVE-2026-59951   MCP HTTP server never frees session state. We run no MCP server.
         #     CVE-2026-116685  MCP HTTP client follows redirects to other hosts. We run no MCP client.
         #     CVE-2026-116684  MCP server login does not check who a token is for. We run no MCP server.
         #     CVE-2026-116686  MCP client fetches $ref URLs in a tool schema. We run no MCP client.
+        #     CVE-2026-115563  MCP OAuth client sends credentials to a server-chosen token endpoint. No MCP client, no OAuth.
         #   opentelemetry-api 1.37.0:
         #     CVE-2026-114603  slow regex on an incoming "tracestate" web header. Nothing sends us headers.
         #     CVE-2026-126360  slow regex on an incoming "traceparent" web header. Nothing sends us headers.
+        #   wcmatch 8.5.2:
+        #     CVE-2026-132276  slow matching on a crafted file name. Semgrep only matches our own repo's file names.
         # Remove these lines as soon as a Semgrep release allows the fixed versions.
+        #
+        # requirements-garak.txt (garak red team folder, Colab only, never installed here): no exceptions
+        # (Sam, 23 November 2026). pip-audit cannot read a version from its one PyTorch web-address line
+        # ("URL requirements cannot be pinned"), so it audits a temporary copy where only that line becomes
+        # a plain torch==<version> pin, same hash. The version is read from the line itself, never typed here.
+        # The step fails unless the file has exactly one torch line, in that exact form.
         run: |
+          set -euo pipefail
           pip-audit -r requirements.txt --no-deps --disable-pip --strict --progress-spinner off
           pip-audit -r requirements-ci.txt --no-deps --disable-pip --strict --progress-spinner off \
             --ignore-vuln CVE-2026-59951 \
             --ignore-vuln CVE-2026-116685 \
             --ignore-vuln CVE-2026-116684 \
             --ignore-vuln CVE-2026-116686 \
+            --ignore-vuln CVE-2026-115563 \
             --ignore-vuln CVE-2026-114603 \
-            --ignore-vuln CVE-2026-126360
+            --ignore-vuln CVE-2026-126360 \
+            --ignore-vuln CVE-2026-132276
+          torch_url='^torch @ https://download\.pytorch\.org/whl/cpu/torch-([0-9][0-9.]*)%2Bcpu-[^ ]+\.whl \\$'
+          torch_lines=$(grep -cE '^torch([^A-Za-z0-9._-]|$)' requirements-garak.txt || true)
+          url_lines=$(grep -cE "$torch_url" requirements-garak.txt || true)
+          if [ "$torch_lines" != "1" ] || [ "$url_lines" != "1" ]; then
+            echo "requirements-garak.txt: expected exactly one torch line, the PyTorch CPU web address" \
+                 "(found $torch_lines torch line(s), $url_lines in that form)"
+            exit 1
+          fi
+          torch_version=$(sed -nE "s|$torch_url|\1|p" requirements-garak.txt)
+          audit_copy="$RUNNER_TEMP/requirements-garak-audit.txt"
+          sed -E "s|$torch_url|torch==$torch_version \\\\|" requirements-garak.txt > "$audit_copy"
+          if [ "$(grep -cE "^torch==$torch_version \\\\$" "$audit_copy" || true)" != "1" ] || grep -q '^torch @' "$audit_copy"; then
+            echo "requirements-garak.txt: could not write torch==$torch_version into the audit copy"
+            exit 1
+          fi
+          echo "Auditing requirements-garak.txt with torch==$torch_version, read from its PyTorch CPU line"
+          pip-audit -r "$audit_copy" --no-deps --disable-pip --strict --progress-spinner off
 
       - name: gitleaks (keys and tokens anywhere in the git history)
         if: ${{ !cancelled() }}

@@ -334,6 +334,23 @@ def test_garak_results_go_to_the_git_ignored_logs_folder():
     assert 'gk.PROJECT_ROOT / "logs" / "redteam"' in GARAK_CODE
 
 
-def test_garak_never_runs_in_ci():
-    workflows = "\n".join(p.read_text(encoding="utf-8") for p in (PROJECT_ROOT / ".github" / "workflows").glob("*.y*ml"))
-    assert "garak" not in workflows.lower()
+WORKFLOWS = "\n".join(p.read_text(encoding="utf-8") for p in (PROJECT_ROOT / ".github" / "workflows").glob("*.y*ml"))
+
+
+def test_garak_is_never_installed_or_run_in_ci():
+    # CI only audits requirements-garak.txt (below); it never installs garak or runs it.
+    for forbidden in ("-r requirements-garak", "requirements-garak-source", "garak_run", "garak_target", "-m garak",
+                      "garak-packages"):
+        assert forbidden not in WORKFLOWS, forbidden
+
+
+def test_ci_audits_the_garak_packages_with_no_accepted_findings_and_reads_the_torch_version_from_its_line():
+    step = WORKFLOWS[WORKFLOWS.index("torch_url="):WORKFLOWS.index("- name: gitleaks")]
+    assert "pip-audit -r \"$audit_copy\" --no-deps --disable-pip --strict --progress-spinner off\n" in step
+    assert "--ignore-vuln" not in step  # no accepted findings for the garak packages
+    assert "2.14.1" not in step  # the version comes from requirements-garak.txt, never typed into CI
+    assert "torch_version=$(sed -nE" in step and 'audit_copy="$RUNNER_TEMP/' in step
+    assert '[ "$torch_lines" != "1" ] || [ "$url_lines" != "1" ]' in step and "exit 1" in step
+    assert "set -euo pipefail" in WORKFLOWS
+    # The form CI looks for is the one form the hash script accepts.
+    assert r"download\.pytorch\.org/whl/cpu/torch-" in step
