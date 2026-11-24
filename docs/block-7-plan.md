@@ -142,7 +142,8 @@ Changed from the plan above, as Sam asked (19 November 2026): about 15 attacks f
   4. `minimatch` 10.2.6 (GHSA-g3hv-75wg-m249: a specially built pattern can make matching very slow). **This part does run**, inside glob during `promptfoo eval`; Promptfoo also loads it directly in the code scanner, which we never start. Accepted because a slow pattern has to be written by an attacker, and the only patterns are our own fixed file names. The worst case would be a slow run on Sam's own Colab runtime.
   5. `promptfoo` 0.125.1 itself: flagged only because it brings along the four above.
 - **To do after 2 December 2026:** move to Promptfoo 0.126.0 (it will then be two weeks old). Update `redteam/package.json`, `redteam/package-lock.json` and `PROMPTFOO_VERSION` in `src/dora_agent/redteam/notebook.py`, run `npm audit` again, and remove this list if it comes back clean.
-- **Not yet done:** the live run in Colab with Groq, and garak (d3).
+- **Live run.** First live Promptfoo run on 24 November 2026 (UTC) in Colab with Groq `openai/gpt-oss-120b`: all 15 cases ran, 15 PASS, 0 FAIL, 0 NOT TESTED, 95,187 tokens, about 13 minutes. The key check was clean. Results that came back undetermined come from the 4-step limit per case, and undetermined is the safe outcome.
+- **Not yet done:** garak (d3).
 
 ### d3) garak (second opinion)
 
